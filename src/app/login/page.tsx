@@ -14,7 +14,7 @@ export default function Login() {
   const router = useRouter();
   const registration = mode === "register" || mode === "admin";
 
-  useEffect(() => { getSystemConfig().then(config => setInitial(!config?.initialized)).catch(() => setInitial(false)); }, []);
+  useEffect(() => { getSystemConfig().then(config => setInitial(!config?.initialized)).catch(() => setInitial(true)); }, []);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setMessage("");
@@ -40,7 +40,7 @@ export default function Login() {
       <Button type="submit">{mode === "admin" ? "CRIAR ADMINISTRADOR" : mode === "register" ? "CRIAR CONTA" : "ENTRAR"}</Button>
     </form>
     {message && <p className="error">{message}</p>}
-    {mode === "login" && <div className="auth-actions"><button type="button" className="text-button" onClick={async () => { const email = prompt("Informe seu e-mail"); if (email) { await resetPassword(email); setMessage("E-mail de recuperação enviado."); } }}>Esqueci minha senha</button><button type="button" className="secondary-button" onClick={() => setMode("register")}>CADASTRAR NOVO USUÁRIO</button>{initial && <button type="button" className="admin-button" onClick={() => setMode("admin")}>CRIAR ADMINISTRADOR</button>}</div>}
+    {mode === "login" && <div className="auth-actions"><button type="button" className="text-button" onClick={async () => { const email = prompt("Informe seu e-mail"); if (email) { await resetPassword(email); setMessage("E-mail de recuperação enviado."); } }}>Esqueci minha senha</button><button type="button" className="secondary-button" onClick={() => setMode("register")}>CADASTRAR NOVO USUÁRIO</button>{initial && <button type="button" className="admin-button" onClick={() => setMode("admin")}>PRIMEIRO ACESSO: CRIAR ADMINISTRADOR</button>}</div>}
     {mode !== "login" && <button type="button" className="text-button" onClick={() => { setMode("login"); setMessage(""); }}>Já tem conta? Entrar</button>}
   </Card></div>;
 }

@@ -6,7 +6,7 @@ service cloud.firestore { match /databases/{database}/documents {
   match /users/{uid} {
     allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
     allow create: if signedIn() && request.auth.uid == uid && (request.resource.data.role == 'user' || (!exists(/databases/$(database)/documents/system/config) && request.resource.data.role == 'admin'));
-    allow update: if isAdmin() || (signedIn() && request.auth.uid == uid && request.resource.data.role == resource.data.role);
+    allow update: if isAdmin() || (signedIn() && request.auth.uid == uid && (request.resource.data.role == resource.data.role || (!exists(/databases/$(database)/documents/system/config) && request.resource.data.role == 'admin')));
     allow delete: if isAdmin();
   }
   match /exercises/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
