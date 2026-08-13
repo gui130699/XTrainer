@@ -1,0 +1,178 @@
+XTRAINER — DOCUMENTAÇÃO COMPLETA E ÍNDICE DE CÓDIGO-FONTE
+===========================================================
+
+1. VISÃO GERAL
+--------------
+XTrainer é um PWA pessoal para treino de musculação. O sistema usa Next.js
+(App Router), React, TypeScript, Firebase Authentication, Cloud Firestore,
+Firebase Storage, Recharts e GitHub Pages. A interface é responsiva e o
+projeto pode ser instalado como aplicativo compatível com PWA.
+
+URL DE PRODUÇÃO
+https://gui130699.github.io/XTrainer/
+
+REPOSITÓRIO
+https://github.com/gui130699/XTrainer
+
+2. RECURSOS IMPLEMENTADOS
+-------------------------
+- Login, logout, recuperação de senha e criação de conta.
+- Criação única do primeiro administrador.
+- Admin pode cadastrar e remover exercícios.
+- Usuário pode montar seus próprios treinos usando exercícios da biblioteca.
+- Execução de treino: carga, repetições, séries extras, volume e descanso.
+- Histórico de sessões e evolução de peso com gráfico.
+- Perfil e saudação usando o primeiro nome cadastrado.
+- Navegação mobile inferior e menu lateral no desktop.
+- Manifesto PWA, service worker e cache offline básico.
+- Deploy estático automático para GitHub Pages.
+
+3. ARQUITETURA E DADOS
+----------------------
+Coleções Firestore:
+system/config              estado inicial e UID do administrador
+users/{uid}                perfil, papel e preferências do usuário
+exercises/{id}             biblioteca de exercícios (somente administrador)
+workouts/{id}              treino de cada usuário
+workoutSessions/{id}       snapshot de uma sessão executada
+bodyWeights/{id}           registros de peso
+physicalAssessments/{id}   estrutura para avaliações físicas
+personalRecords/{id}       estrutura para recordes
+
+Papel de acesso:
+- admin: pode administrar biblioteca de exercícios e configurações.
+- user: pode criar e operar os próprios treinos, sessões, pesos e dados.
+
+4. FLUXO DO PRIMEIRO ADMINISTRADOR
+----------------------------------
+1. A tela de login consulta system/config.
+2. Se não existir administrador, mostra “PRIMEIRO ACESSO: CRIAR ADMINISTRADOR”.
+3. O cadastro cria ou reutiliza a conta existente, grava role=admin e
+   system/config { initialized: true, adminUid } em transação.
+4. Depois disso o botão deixa de aparecer.
+5. As regras Firestore impedem um segundo administrador por esse fluxo.
+
+5. CONFIGURAÇÃO LOCAL
+---------------------
+1. Copie .env.example para .env.local.
+2. Execute npm install.
+3. Execute npm run dev.
+4. Abra http://localhost:3000.
+
+Scripts:
+  npm run dev      desenvolvimento
+  npm run lint     análise ESLint
+  npm run build    build estático de produção
+  npm run start    servidor Next.js
+
+Publicação das regras Firebase:
+  firebase deploy --only firestore:rules,firestore:indexes --project xtrainer-45f8d
+  firebase deploy --only storage --project xtrainer-45f8d
+
+Observação: o Storage deve ser ativado uma vez no Firebase Console antes do
+primeiro deploy das regras de Storage.
+
+6. ESTRUTURA COMPLETA DO CÓDIGO-FONTE
+-------------------------------------
+package.json                         dependências e scripts
+next.config.ts                       exportação estática GitHub Pages
+firebase.json                        configuração Firebase CLI
+firestore.rules                      autorização Firestore
+storage.rules                        autorização Storage
+firestore.indexes.json               índices das consultas
+public/manifest.webmanifest          metadados PWA
+public/sw.js                         cache/service worker
+public/icon.svg                      ícone PWA
+.github/workflows/deploy-pages.yml   CI/CD do GitHub Pages
+src/app/layout.tsx                   layout raiz e metadados
+src/app/globals.css                  tema e responsividade
+src/app/page.tsx                     dashboard
+src/app/login/page.tsx               login/cadastro/primeiro admin
+src/app/treino/page.tsx              criação e execução de treino
+src/app/evolucao/page.tsx            gráfico de peso
+src/app/historico/page.tsx           histórico de sessões
+src/app/perfil/page.tsx              perfil e administração
+src/app/admin/page.tsx               biblioteca de exercícios/admin
+src/components/app-shell.tsx         navegação principal
+src/components/providers.tsx         sessão Firebase e cache PWA
+src/components/guard.tsx             proteção de rotas
+src/components/ui.tsx                componentes reutilizáveis
+src/lib/firebase.ts                  instâncias Firebase
+src/lib/utils.ts                     utilitários
+src/services/auth.ts                 autenticação e perfis
+src/services/data.ts                 persistência Firestore
+src/types/index.ts                   contratos TypeScript
+
+7. CÓDIGO-FONTE — CONFIGURAÇÃO PRINCIPAL
+-----------------------------------------
+ARQUIVO: next.config.ts
+import type { NextConfig } from "next";
+const isGitHubPages = process.env.GITHUB_ACTIONS === "true";
+const nextConfig: NextConfig = {
+  reactStrictMode: true, output: "export", trailingSlash: true,
+  typescript: { ignoreBuildErrors: true }, eslint: { ignoreDuringBuilds: true },
+  basePath: isGitHubPages ? "/XTrainer" : "",
+  assetPrefix: isGitHubPages ? "/XTrainer/" : undefined,
+};
+export default nextConfig;
+
+ARQUIVO: src/lib/firebase.ts
+import { getApp, getApps, initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+const config = { apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyBI1sPxggPRkZwIV4zaPavk7gOECAsDi9s", authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "xtrainer-45f8d.firebaseapp.com", projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "xtrainer-45f8d", storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "xtrainer-45f8d.firebasestorage.app", messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "204702937283", appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:204702937283:web:719cda9778e7a45669f276" };
+export const app = getApps().length ? getApp() : initializeApp(config);
+export const auth = getAuth(app);
+export const db = (() => { try { return initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch { return getFirestore(app); } })();
+export const storage = getStorage(app);
+
+8. CÓDIGO-FONTE — REGRAS DE SEGURANÇA
+--------------------------------------
+ARQUIVO: firestore.rules
+rules_version = '2';
+service cloud.firestore { match /databases/{database}/documents {
+  function signedIn() { return request.auth != null; }
+  function isAdmin() { return signedIn() && get(/databases/$(database)/documents/system/config).data.adminUid == request.auth.uid; }
+  match /system/config { allow read: if true; allow create: if signedIn() && !exists(/databases/$(database)/documents/system/config); allow update, delete: if isAdmin(); }
+  match /users/{uid} {
+    allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+    allow create: if signedIn() && request.auth.uid == uid && (request.resource.data.role == 'user' || (!exists(/databases/$(database)/documents/system/config) && request.resource.data.role == 'admin'));
+    allow update: if isAdmin() || (signedIn() && request.auth.uid == uid && (request.resource.data.role == resource.data.role || (!exists(/databases/$(database)/documents/system/config) && request.resource.data.role == 'admin')));
+    allow delete: if isAdmin();
+  }
+  match /exercises/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
+  match /workouts/{id} { allow read: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid); allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid; allow update, delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId); }
+  match /{collection}/{id} { allow read, write: if signedIn() && resource.data.ownerId == request.auth.uid; allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid; }
+} }
+
+9. CÓDIGO-FONTE — SERVIÇOS
+---------------------------
+ARQUIVO: src/services/data.ts (resumo funcional completo)
+- exercises.list/save/remove: biblioteca Firestore.
+- workouts.list/save: treinos pertencentes ao ownerId.
+- weights.list/save/remove: peso corporal.
+- assessments.list/save: avaliações físicas.
+- sessions.list/get/start/save: sessão com snapshot de exercícios e séries.
+
+O código-fonte íntegro e editável de cada módulo listado na seção 6 está no
+repositório. Este arquivo funciona como documentação técnica e índice de
+implementação; para evitar duplicação e divergência, a fonte canônica é cada
+arquivo TypeScript/CSS/JSON indicado acima.
+
+10. CI/CD
+----------
+O workflow .github/workflows/deploy-pages.yml executa em todo push na main:
+1. checkout; 2. Node 22; 3. npm ci; 4. npm run build; 5. upload de out;
+6. actions/deploy-pages. O Pages está configurado no modo GitHub Actions.
+
+11. LIMITAÇÕES ATUAIS E PRÓXIMAS EVOLUÇÕES
+------------------------------------------
+- O formulário de novo treino cria inicialmente um exercício; a estrutura já
+  suporta múltiplos e pode receber interface de reordenação.
+- Storage foi preparado nas regras, mas deve ser ativado no Console antes de
+  fotos de evolução.
+- Avaliações e recordes possuem tipos/coleções preparados, com expansão de
+  telas pendente.
+- O código de produção deve remover ignoreBuildErrors/ignoreDuringBuilds após
+  a revisão total de tipagem e lint.
