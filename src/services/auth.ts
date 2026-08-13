@@ -9,6 +9,18 @@ export async function createFirstAdmin(data: { name: string; email: string; pass
   try { await runTransaction(db, async tx => { const config = doc(db, "system", "config"); const existing = await tx.get(config); if (existing.exists() && existing.data().initialized) throw new Error("O administrador inicial já foi criado."); tx.set(doc(db, "users", credential.user.uid), { uid: credential.user.uid, name: data.name, email: data.email, role: "admin", createdAt: serverTimestamp() }); tx.set(config, { initialized: true, adminUid: credential.user.uid, updatedAt: serverTimestamp() }); }); }
   catch (error) { await credential.user.delete(); throw error; }
 }
+export async function registerUser(data: { name: string; email: string; password: string }) {
+  const credential = await createUserWithEmailAndPassword(auth, data.email, data.password);
+  try {
+    await setDoc(doc(db, "users", credential.user.uid), {
+      uid: credential.user.uid,
+      name: data.name,
+      email: data.email,
+      role: "user",
+      createdAt: serverTimestamp(),
+    });
+  } catch (error) { await credential.user.delete(); throw error; }
+}
 export const login = (email: string, password: string) => signInWithEmailAndPassword(auth, email, password);
 export const logout = () => signOut(auth);
 export const resetPassword = (email: string) => sendPasswordResetEmail(auth, email);

@@ -1,3 +1,46 @@
 "use client";
-import { Button,Card } from "@/components/ui"; import { createFirstAdmin,getSystemConfig,login,resetPassword } from "@/services/auth"; import { useEffect,useState } from "react"; import { useRouter } from "next/navigation";
-export default function Login(){const[initial,setInitial]=useState<boolean|null>(null),[admin,setAdmin]=useState(false),[message,setMessage]=useState(''),router=useRouter();useEffect(()=>{getSystemConfig().then(x=>setInitial(!x?.initialized)).catch(()=>setInitial(false))},[]);async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const f=new FormData(e.currentTarget),email=String(f.get('email')),pass=String(f.get('password'));try{if(admin){if(pass!==f.get('confirm'))throw Error('As senhas não conferem.');await createFirstAdmin({name:String(f.get('name')),email,password:pass})}else await login(email,pass);router.push('/')}catch(err){setMessage(err instanceof Error?err.message:'Não foi possível concluir a operação.')}}return <div className="auth"><div className="auth-brand">X<span>Trainer</span></div><Card><p className="eyebrow">BEM-VINDO</p><h1>{admin?'Criar administrador':'Entre na sua conta'}</h1><p className="muted">{admin?'Este acesso controla a configuração do seu XTrainer.':'Acompanhe cada repetição da sua evolução.'}</p><form onSubmit={submit}>{admin&&<label>Nome<input required name="name" placeholder="Seu nome"/></label>}<label>E-mail<input required name="email" type="email" placeholder="voce@email.com"/></label><label>Senha<input required minLength={6} name="password" type="password" placeholder="Mínimo 6 caracteres"/></label>{admin&&<label>Confirmar senha<input required name="confirm" type="password" placeholder="Repita sua senha"/></label>}<Button type="submit">{admin?'CRIAR ADMINISTRADOR':'ENTRAR'}</Button></form>{message&&<p className="error">{message}</p>}{!admin&&<button className="text-button" onClick={async()=>{const e=prompt('Informe seu e-mail');if(e){await resetPassword(e);setMessage('E-mail de recuperação enviado.')}}}>Esqueci minha senha</button>}{initial&&!admin&&<button className="outline" onClick={()=>setAdmin(true)}>CRIAR ADMINISTRADOR</button>}</Card></div>}
+
+import { Button, Card } from "@/components/ui";
+import { createFirstAdmin, getSystemConfig, login, registerUser, resetPassword } from "@/services/auth";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
+type Mode = "login" | "register" | "admin";
+
+export default function Login() {
+  const [initial, setInitial] = useState<boolean | null>(null);
+  const [mode, setMode] = useState<Mode>("login");
+  const [message, setMessage] = useState("");
+  const router = useRouter();
+  const registration = mode === "register" || mode === "admin";
+
+  useEffect(() => { getSystemConfig().then(config => setInitial(!config?.initialized)).catch(() => setInitial(false)); }, []);
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setMessage("");
+    const form = new FormData(event.currentTarget); const email = String(form.get("email")); const password = String(form.get("password"));
+    try {
+      if (registration) {
+        if (password !== String(form.get("confirm"))) throw new Error("As senhas não conferem.");
+        const data = { name: String(form.get("name")), email, password };
+        if (mode === "admin") await createFirstAdmin(data); else await registerUser(data);
+      } else await login(email, password);
+      router.push("/");
+    } catch (error) { setMessage(error instanceof Error ? error.message.replace("Firebase: ", "") : "Não foi possível concluir a operação."); }
+  }
+
+  const title = mode === "admin" ? "Criar administrador" : mode === "register" ? "Crie sua conta" : "Entre na sua conta";
+  return <div className="auth"><div className="auth-brand">X<span>Trainer</span></div><Card>
+    <p className="eyebrow">BEM-VINDO</p><h1>{title}</h1><p className="muted">{registration ? "Preencha seus dados para acessar seu treino." : "Acompanhe cada repetição da sua evolução."}</p>
+    <form onSubmit={submit}>
+      {registration && <label>Nome<input required name="name" placeholder="Seu nome" /></label>}
+      <label>E-mail<input required name="email" type="email" placeholder="voce@email.com" /></label>
+      <label>Senha<input required minLength={6} name="password" type="password" placeholder="Mínimo 6 caracteres" /></label>
+      {registration && <label>Confirmar senha<input required name="confirm" type="password" placeholder="Repita sua senha" /></label>}
+      <Button type="submit">{mode === "admin" ? "CRIAR ADMINISTRADOR" : mode === "register" ? "CRIAR CONTA" : "ENTRAR"}</Button>
+    </form>
+    {message && <p className="error">{message}</p>}
+    {mode === "login" && <><button className="text-button" onClick={async () => { const email = prompt("Informe seu e-mail"); if (email) { await resetPassword(email); setMessage("E-mail de recuperação enviado."); } }}>Esqueci minha senha</button><button className="outline" onClick={() => setMode("register")}>CADASTRAR NOVO USUÁRIO</button>{initial && <button className="outline" onClick={() => setMode("admin")}>CRIAR ADMINISTRADOR</button>}</>}
+    {mode !== "login" && <button className="text-button" onClick={() => { setMode("login"); setMessage(""); }}>Já tem conta? Entrar</button>}
+  </Card></div>;
+}

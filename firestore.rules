@@ -3,7 +3,12 @@ service cloud.firestore { match /databases/{database}/documents {
   function signedIn() { return request.auth != null; }
   function isAdmin() { return signedIn() && get(/databases/$(database)/documents/system/config).data.adminUid == request.auth.uid; }
   match /system/config { allow read: if true; allow create: if signedIn() && !exists(/databases/$(database)/documents/system/config); allow update, delete: if isAdmin(); }
-  match /users/{uid} { allow read, create, update: if signedIn() && (request.auth.uid == uid || isAdmin()); allow delete: if isAdmin(); }
+  match /users/{uid} {
+    allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+    allow create: if signedIn() && request.auth.uid == uid && (request.resource.data.role == 'user' || (!exists(/databases/$(database)/documents/system/config) && request.resource.data.role == 'admin'));
+    allow update: if isAdmin() || (signedIn() && request.auth.uid == uid && request.resource.data.role == resource.data.role);
+    allow delete: if isAdmin();
+  }
   match /exercises/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
   match /workouts/{id} { allow read, write: if isAdmin(); }
   match /{collection}/{id} { allow read, write: if signedIn() && resource.data.ownerId == request.auth.uid; allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid; }
