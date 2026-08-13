@@ -1,43 +1,17 @@
 "use client";
-
 import { AppShell } from "@/components/app-shell";
 import { Guard } from "@/components/guard";
-import { Button, Card, Empty } from "@/components/ui";
+import { Button, Card, Empty, Loading } from "@/components/ui";
 import { useAuth } from "@/components/providers";
-import { muscleGroups } from "@/lib/utils";
-import { exercises, weights, workouts } from "@/services/data";
-import type { Exercise, Workout } from "@/types";
-import { useEffect, useState } from "react";
+import { exerciseMuscleGroups, normalizeSearchText } from "@/lib/utils";
+import { exercises } from "@/services/data";
+import type { Exercise, SeedResult } from "@/types";
+import { ExternalLink, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
-function Admin() {
-  const { user } = useAuth();
-  const [tab, setTab] = useState<"exercises" | "workouts" | "weight">("exercises");
-  const [exerciseList, setExerciseList] = useState<Exercise[]>([]);
-  const [workoutList, setWorkoutList] = useState<Workout[]>([]);
-  const [saved, setSaved] = useState("");
-  const reload = () => { if (user) { exercises.list().then(setExerciseList); workouts.list(user.uid).then(setWorkoutList); } };
-  useEffect(reload, [user]);
-  if (!user) return null;
-
-  return <AppShell><header><p className="eyebrow">ADMINISTRAÇÃO</p><h1>Configure seu XTrainer.</h1></header>
-    <div className="tabs">{(["exercises", "workouts", "weight"] as const).map(item => <button className={tab === item ? "active" : ""} onClick={() => setTab(item)} key={item}>{item === "exercises" ? "Exercícios" : item === "workouts" ? "Treinos" : "Peso"}</button>)}</div>
-    {saved && <p className="success">{saved}</p>}
-    {tab === "exercises" && <>
-      <Card><h2>Novo exercício</h2><form onSubmit={async event => { event.preventDefault(); const form = new FormData(event.currentTarget); await exercises.save({ name: String(form.get("name")), muscleGroup: String(form.get("group")), equipment: String(form.get("equipment")) || undefined, videoUrl: String(form.get("video")) || undefined, description: String(form.get("description")) || undefined, active: true }); event.currentTarget.reset(); setSaved("Exercício salvo."); reload(); }}>
-        <label>Nome<input name="name" required /></label><label>Grupo muscular<select name="group">{muscleGroups.map(group => <option key={group}>{group}</option>)}</select></label><label>Equipamento<input name="equipment" /></label><label>Vídeo<input name="video" type="url" placeholder="https://" /></label><label>Descrição<textarea name="description" /></label><Button>SALVAR EXERCÍCIO</Button>
-      </form></Card>
-      <Card><h2>Biblioteca</h2>{exerciseList.length ? exerciseList.map(exercise => <div className="row" key={exercise.id}><span><strong>{exercise.name}</strong><small>{exercise.muscleGroup}</small></span><button className="text-button" onClick={async () => { if (confirm(`Excluir ${exercise.name}?`)) { await exercises.remove(exercise.id); reload(); } }}>Excluir</button></div>) : <Empty title="Biblioteca vazia" detail="Cadastre os exercícios que você utiliza." />}</Card>
-    </>}
-    {tab === "workouts" && <>
-      <Card><h2>Novo treino</h2><form onSubmit={async event => { event.preventDefault(); const form = new FormData(event.currentTarget); await workouts.save({ ownerId: user.uid, name: String(form.get("name")), title: String(form.get("title")), description: String(form.get("description")) || undefined, muscleGroups: [], exercises: [], active: true }); event.currentTarget.reset(); setSaved("Treino criado."); reload(); }}>
-        <label>Nome<input name="name" required placeholder="Treino A" /></label><label>Título<input name="title" required placeholder="Peitoral e tríceps" /></label><label>Descrição<textarea name="description" /></label><Button>CRIAR TREINO</Button>
-      </form></Card>
-      <Card><h2>Treinos ativos</h2>{workoutList.length ? workoutList.map(workout => <div className="row" key={workout.id}><span><strong>{workout.title}</strong><small>{workout.name} · {workout.exercises.length} exercícios</small></span></div>) : <Empty title="Sem treinos" detail="Crie sua divisão semanal." />}</Card>
-    </>}
-    {tab === "weight" && <Card><h2>Registrar peso</h2><form onSubmit={async event => { event.preventDefault(); const form = new FormData(event.currentTarget); await weights.save({ ownerId: user.uid, date: String(form.get("date")), weight: Number(form.get("weight")), note: String(form.get("note")) || undefined }); event.currentTarget.reset(); setSaved("Peso registrado."); }}>
-      <label>Data<input type="date" name="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></label><label>Peso (kg)<input type="number" name="weight" step="0.1" required /></label><label>Observação<textarea name="note" /></label><Button>SALVAR PESO</Button>
-    </form></Card>}
-  </AppShell>;
-}
-
-export default function Page() { return <Guard admin><Admin /></Guard>; }
+function Admin(){const{user}=useAuth();const[list,setList]=useState<Exercise[]>([]),[loading,setLoading]=useState(true),[search,setSearch]=useState(""),[group,setGroup]=useState(""),[order,setOrder]=useState<"default"|"az"|"za">("default"),[importing,setImporting]=useState(false),[result,setResult]=useState<SeedResult|null>(null);
+const reload=async()=>{setLoading(true);try{setList(await exercises.list())}finally{setLoading(false)}};useEffect(()=>{reload()},[]);
+const filtered=useMemo(()=>{const query=normalizeSearchText(search);return list.filter(item=>!group||item.muscleGroup===group).filter(item=>!query||[item.name,item.nameEn,...(item.aliases??[])].filter(Boolean).some(value=>normalizeSearchText(value!).includes(query))).sort((a,b)=>order==="default"?(a.sortOrder??9999)-(b.sortOrder??9999):order==="az"?a.name.localeCompare(b.name,"pt-BR"):b.name.localeCompare(a.name,"pt-BR"));},[list,search,group,order]);
+async function seed(){if(!confirm("Deseja importar/atualizar a biblioteca padrão de exercícios? Os exercícios existentes serão atualizados quando necessário e não serão duplicados."))return;setImporting(true);setResult(null);try{setResult(await exercises.seedDefaultLibrary());await reload()}catch(error){alert(error instanceof Error?error.message:"A importação falhou.")}finally{setImporting(false)}}
+return <AppShell><header><p className="eyebrow">ADMINISTRAÇÃO</p><h1>Biblioteca de exercícios</h1><p>Gerencie a biblioteca global usada na montagem dos treinos.</p></header><Card><div className="library-head"><div><h2>Biblioteca padrão</h2><p>{list.length} exercícios cadastrados</p></div><Button onClick={seed} disabled={importing}>{importing?"IMPORTANDO EXERCÍCIOS...":"IMPORTAR BIBLIOTECA PADRÃO"}</Button></div>{result&&<p className="success">Biblioteca atualizada: {result.total} processados · {result.created} criados · {result.updated} atualizados · {result.skipped} ignorados · {result.errors} erros.</p>}</Card><Card><div className="library-filters"><label><span className="sr-only">Pesquisar exercícios</span><span className="search-input"><Search size={17}/><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Pesquisar nome, inglês ou alias"/></span></label><label>Grupo<select value={group} onChange={event=>setGroup(event.target.value)}><option value="">Todos os grupos</option>{exerciseMuscleGroups.map(item=><option key={item}>{item}</option>)}</select></label><label>Ordenar<select value={order} onChange={event=>setOrder(event.target.value as "default"|"az"|"za")}><option value="default">Ordem padrão</option><option value="az">A-Z</option><option value="za">Z-A</option></select></label>{(search||group||order!=="default")&&<button className="text-button" onClick={()=>{setSearch("");setGroup("");setOrder("default")}}>Limpar filtros</button>}</div><p className="muted">{filtered.length} exercícios encontrados</p>{loading?<Loading/>:filtered.length?<div className="exercise-library">{filtered.map(item=><article className="library-item" key={item.id}><div><strong>{item.name}</strong>{item.nameEn&&<small>{item.nameEn}</small>}<span>{item.muscleGroup}</span></div>{item.videoUrl&&<a className="video-link" href={item.videoUrl} target="_blank" rel="noopener noreferrer" aria-label={`Ver execução de ${item.name}`}><ExternalLink size={16}/> Ver execução</a>}</article>)}</div>:<Empty title="Nenhum exercício encontrado." detail="Tente pesquisar outro nome ou remover os filtros."/>}</Card></AppShell>}
+export default function Page(){return <Guard admin><Admin/></Guard>}

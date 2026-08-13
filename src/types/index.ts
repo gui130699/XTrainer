@@ -1,7 +1,9 @@
 import type { Timestamp } from "firebase/firestore";
 export type Id = string;
 export interface UserProfile { uid: Id; name: string; email: string; role: "admin" | "user"; birthDate?: string; height?: number; sex?: string; goal?: string; photoURL?: string; createdAt?: Timestamp }
-export interface Exercise { id: Id; name: string; muscleGroup: string; muscleSubgroup?: string; equipment?: string; videoUrl?: string; description?: string; instructions?: string; notes?: string; active: boolean; createdAt?: Timestamp; updatedAt?: Timestamp }
+export interface Exercise { id: Id; name: string; nameEn?: string; aliases?: string[]; muscleGroup: string; muscleSubgroup?: string; equipment?: string; videoUrl?: string; sortOrder?: number; description?: string; instructions?: string; notes?: string; active: boolean; createdAt?: Timestamp; updatedAt?: Timestamp }
+export interface DefaultExercise { id: Id; name: string; nameEn: string; aliases?: string[]; muscleGroup: string; videoUrl: string; active: boolean; sortOrder: number }
+export interface SeedResult { total: number; created: number; updated: number; skipped: number; errors: number }
 export interface WorkoutExercise { id: Id; exerciseId: Id; name: string; order: number; sets: number; repsMin: number; repsMax: number; restSeconds: number; suggestedLoad?: number; notes?: string }
 export interface Workout { id: Id; ownerId: Id; name: string; title: string; description?: string; muscleGroups: string[]; exercises: WorkoutExercise[]; active: boolean; createdAt?: Timestamp; updatedAt?: Timestamp }
 export interface TrainingSet { id: Id; load: number; reps: number; rpe?: number; rir?: number; completed: boolean; completedAt?: Timestamp; volume: number }
