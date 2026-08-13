@@ -1,5 +1,7 @@
 # Checklist Funcional do XTrainer
 
+> Atualizado em 13/08/2026 — peso completo, builder de treino, CRUD de treino e retomada de sessão foram implementados e verificados por lint/TypeScript/build.
+
 ## Autenticação
 - [x] Login por e-mail e senha
 - [x] Cadastro de usuário
@@ -20,22 +22,22 @@
 
 ## Treinos e sessões
 - [x] Criar treino com um exercício
-- [ ] Adicionar vários exercícios
-- [ ] Editar/excluir/duplicar/reordenar treino
+- [x] Adicionar vários exercícios
+- [x] Editar/excluir/duplicar/reordenar treino
 - [x] Iniciar sessão e registrar carga/repetições
 - [x] Calcular volume por série concluída
 - [x] Adicionar série extra na sessão
 - [x] Timer básico com pular e +15s
 - [ ] Pausar/alertar/persistir timer
-- [ ] Retomar sessão ativa após reload
-- [ ] Cancelar/desfazer série/remover série
+- [x] Retomar sessão ativa após reload
+- [x] Cancelar/desfazer série/remover série
 
 ## Histórico e evolução
 - [x] Listar sessões concluídas resumidas
 - [ ] Abrir detalhes da sessão
 - [x] Mostrar gráfico de peso real
-- [ ] Registrar peso como usuário comum
-- [ ] Editar/excluir/listar pesagens
+- [x] Registrar peso como usuário comum
+- [x] Editar/excluir/listar pesagens
 - [ ] Avaliações físicas, medidas e fotos
 - [ ] Recordes pessoais e histórico por exercício
 

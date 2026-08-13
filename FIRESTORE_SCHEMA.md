@@ -1,5 +1,7 @@
 # Inventário Firestore do XTrainer
 
+> Atualização 13/08/2026: `workoutSessions` possui consulta de sessão ativa (`ownerId` + `status`) e status `cancelled`; `bodyWeights` tem operação de atualização com `updatedAt` opcional.
+
 ## `system/config`
 
 - **ID:** fixo `config`.

@@ -4,3 +4,5 @@ export const muscleGroups = ["Peitoral","Costas","Bíceps","Tríceps","Ombros","
 export const exerciseMuscleGroups = ["Peito","Dorsais","Costas","Trapézio","Ombros","Bíceps","Tríceps","Antebraço","Quadríceps","Posterior de Coxa","Glúteos","Abdutores","Adutores","Panturrilha","Tibial Anterior","Abdômen","Core","Lombar"];
 export const normalizeSearchText = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/\s+/g, " ");
 export const slugifyExerciseName = (name: string) => normalizeSearchText(name).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+export const parseBrazilianNumber = (value: string) => Number(value.trim().replace(",", "."));
+export const formatDateBR = (value: string) => { const [year, month, day] = value.split("-"); return year && month && day ? `${day}/${month}/${year}` : value; };

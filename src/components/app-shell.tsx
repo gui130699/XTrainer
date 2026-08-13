@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { BarChart3, Dumbbell, History, Home, UserRound, Wifi, WifiOff } from "lucide-react";
+import { BarChart3, Dumbbell, History, Home, UserRound } from "lucide-react";
 import { useEffect,useState } from "react";
 import { useAuth } from "@/components/providers";
 const links=[['/','Início',Home],['/treino','Treino',Dumbbell],['/evolucao','Evolução',BarChart3],['/historico','Histórico',History],['/perfil','Perfil',UserRound]] as const;

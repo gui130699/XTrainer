@@ -1,5 +1,12 @@
 # Pendências e Melhorias do XTrainer
 
+## Concluídas em 13/08/2026
+
+- **P-001 — Build mascara problemas de qualidade:** concluída. `ignoreBuildErrors` e `ignoreDuringBuilds` foram removidos; lint, TypeScript e build foram executados sem erro.
+- **P-002 — Sessão ativa não recuperável:** concluída. `sessions.getActive` localiza a sessão ativa; `/treino` oferece retomar ou descartar e persiste alterações de carga, repetições, séries e conclusão.
+- **P-003 — Controle de peso incompleto:** concluída. `/evolucao` possui registro, validação de número brasileiro, edição, exclusão confirmada, cards, gráfico e histórico.
+- **P-004 — Montagem/CRUD de treinos incompleto:** concluída. O builder suporta vários exercícios, prevenção de duplicidade, configuração individual, reordenação, edição, duplicação, arquivamento e exclusão sem apagar sessões.
+
 ## Críticas
 
 ### P-001 — Build mascara problemas de qualidade

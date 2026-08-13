@@ -1,5 +1,7 @@
 # Mapa do Sistema XTrainer
 
+> Atualização 13/08/2026: `/treino` inclui builder de múltiplos exercícios, CRUD e recuperação de sessão ativa; `/evolucao` inclui CRUD e histórico de peso.
+
 ```text
 Visitante
 └── /login

@@ -1,5 +1,7 @@
 # XTrainer — Auditoria técnica e funcional
 
+> Atualização de implementação — 13/08/2026: a criação de treino agora aceita vários exercícios, com configuração individual, ordem, edição, duplicação, arquivamento e exclusão. A rota de evolução permite registrar, editar e excluir peso, com gráfico e histórico. Sessões ativas são recuperadas ao abrir a tela de treino. O build não utiliza mais exceções para ignorar TypeScript ou ESLint.
+
 > Fonte da verdade: código do repositório auditado em 13/08/2026. Esta documentação não trata tipos, collections ou services isolados como recursos completos.
 
 ## Índice
