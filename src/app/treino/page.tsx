@@ -27,11 +27,10 @@ function Work() {
   const [session, setSession] = useState<WorkoutSession | null>(null); const [active, setActive] = useState<WorkoutSession | null>(null); const [rest, setRest] = useState(0);
 
   const reload = async () => { if (uid) { setPlans(await workouts.list(uid)); setActive(await sessions.getActive(uid)); } };
-  useEffect(() => { if (!uid) return; void reload(); exercises.list().then(setLibrary); }, [uid]);
+  useEffect(() => { if (!uid) return; workouts.list(uid).then(setPlans); sessions.getActive(uid).then(setActive); exercises.list().then(setLibrary); }, [uid]);
   useEffect(() => { if (!rest) return; const timer = window.setInterval(() => setRest(value => Math.max(0, value - 1)), 1000); return () => window.clearInterval(timer); }, [rest]);
-  if (!uid) return <Loading />;
-
   const filteredLibrary = useMemo(() => library.filter(item => item.active && (!group || item.muscleGroup === group)).filter(item => { const query = normalizeSearchText(search); return !query || [item.name, item.nameEn, ...(item.aliases ?? [])].filter(Boolean).some(value => normalizeSearchText(value!).includes(query)); }), [library, search, group]);
+  if (!uid) return <Loading />;
   function openBuilder(workout?: Workout) { setBuilder(workout ?? null); setDraft(workout ? reorder(workout.exercises) : []); setName(workout?.name ?? ""); setTitle(workout?.title ?? ""); setDescription(workout?.description ?? ""); setMessage(""); }
   function updateDraft(id: string, data: Partial<WorkoutExercise>) { setDraft(items => items.map(item => item.id === id ? { ...item, ...data } : item)); }
   function addExercise(exercise: Exercise) { if (draft.some(item => item.exerciseId === exercise.id)) { setMessage("Este exercício já foi adicionado ao treino."); return; } setDraft(items => [...items, newExercise(exercise, items.length + 1)]); setMessage(""); }

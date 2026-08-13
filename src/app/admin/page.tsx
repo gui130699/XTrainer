@@ -2,7 +2,6 @@
 import { AppShell } from "@/components/app-shell";
 import { Guard } from "@/components/guard";
 import { Button, Card, Empty, Loading } from "@/components/ui";
-import { useAuth } from "@/components/providers";
 import { exerciseMuscleGroups, normalizeSearchText } from "@/lib/utils";
 import { exercises } from "@/services/data";
 import type { Exercise, SeedResult } from "@/types";
