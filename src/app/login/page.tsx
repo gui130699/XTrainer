@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, Card } from "@/components/ui";
-import { createFirstAdmin, getSystemConfig, login, registerUser, resetPassword } from "@/services/auth";
+import { createFirstAdmin, friendlyAuthError, getSystemConfig, login, registerUser, resetPassword } from "@/services/auth";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -26,7 +26,7 @@ export default function Login() {
         if (mode === "admin") await createFirstAdmin(data); else await registerUser(data);
       } else await login(email, password);
       router.push("/");
-    } catch (error) { setMessage(error instanceof Error ? error.message.replace("Firebase: ", "") : "Não foi possível concluir a operação."); }
+    } catch (error) { setMessage(friendlyAuthError(error)); }
   }
 
   const title = mode === "admin" ? "Criar administrador" : mode === "register" ? "Crie sua conta" : "Entre na sua conta";
