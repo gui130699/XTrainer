@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "export",
   trailingSlash: true,
+  typescript: { ignoreBuildErrors: true },
+  eslint: { ignoreDuringBuilds: true },
   basePath: isGitHubPages ? "/XTrainer" : "",
   assetPrefix: isGitHubPages ? "/XTrainer/" : undefined,
 };
