@@ -8,5 +8,5 @@ const config = { apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyBI1s
 export const firebaseEnabled = Boolean(config.apiKey && config.projectId);
 export const app = getApps().length ? getApp() : initializeApp(config);
 export const auth = getAuth(app);
-export const db = (() => { try { return initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch { return getFirestore(app); } })();
+export const db = (() => { try { return initializeFirestore(app, { ignoreUndefinedProperties: true, localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch { return getFirestore(app); } })();
 export const storage = getStorage(app);
