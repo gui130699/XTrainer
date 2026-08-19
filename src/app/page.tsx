@@ -1,4 +1,72 @@
 "use client";
-import { AppShell } from "@/components/app-shell"; import { Guard } from "@/components/guard"; import { Card,Empty,Loading } from "@/components/ui"; import { useAuth } from "@/components/providers"; import { sessions,weights,workouts } from "@/services/data"; import type { BodyWeight,Workout,WorkoutSession } from "@/types"; import Link from "next/link"; import { Play, Trophy } from "lucide-react"; import { useEffect,useState } from "react"; import { kg } from "@/lib/utils";
-function Dashboard(){const{user,profile}=useAuth();const[items,setItems]=useState<WorkoutSession[]>([]),[plans,setPlans]=useState<Workout[]>([]),[body,setBody]=useState<BodyWeight[]>([]);useEffect(()=>{if(user)Promise.all([sessions.list(user.uid),workouts.list(user.uid),weights.list(user.uid)]).then(([a,b,c])=>{setItems(a);setPlans(b);setBody(c)})},[user]);if(!user)return <Loading/>;const done=items.filter(x=>x.status==='completed'), month=done.filter(x=>new Date((x.startedAt as unknown as {seconds:number})?.seconds*1000||0).getMonth()===new Date().getMonth());const total=done.reduce((s,x)=>s+x.totalVolume,0);const firstName=(profile?.name||user.displayName||user.email?.split('@')[0]||'atleta').trim().split(' ')[0];return <AppShell><header><p className="eyebrow">PAINEL PESSOAL</p><h1>Olá, {firstName}.</h1><p>Seu foco constrói sua evolução.</p></header><Card className="hero"><div><span>PRÓXIMO TREINO</span><h2>{plans.find(x=>x.active)?.title||'Nenhum treino programado'}</h2><p>{plans.find(x=>x.active)?.description||'Crie um treino no painel de administração.'}</p></div><Link className="button" href="/treino"><Play size={18}/> INICIAR TREINO</Link></Card><div className="stat-grid"><Card><span>Treinos no mês</span><strong>{month.length}</strong></Card><Card><span>Volume total</span><strong>{Math.round(total).toLocaleString('pt-BR')} kg</strong></Card><Card><span>Peso atual</span><strong>{body.length?kg(body.at(-1)!.weight):'—'}</strong></Card><Card><span>Sequência</span><strong>{done.length} treinos</strong></Card></div><div className="split"><Card><h3>Últimos treinos</h3>{done.length?done.slice(0,4).map(x=><div className="row" key={x.id}><span>{x.workoutName}</span><small>{x.totalSets} séries · {Math.round(x.totalVolume).toLocaleString('pt-BR')} kg</small></div>):<Empty title="Ainda sem treino" detail="Sua primeira sessão aparecerá aqui."/>}</Card><Card><h3><Trophy size={18}/> Recordes recentes</h3><Empty title="Pronto para começar" detail="Novos recordes serão detectados ao concluir séries."/></Card></div></AppShell>}
-export default function Home(){return <Guard><Dashboard/></Guard>}
+
+import Link from "next/link";
+import { Play, Trophy } from "lucide-react";
+import { AppShell } from "@/components/app-shell";
+import { Guard } from "@/components/guard";
+import { useAuth } from "@/components/providers";
+import { Card, Empty, ErrorState, Loading } from "@/components/ui";
+import { calculateExerciseRecords, calculateMonthlyStats, calculateTrainingStreak } from "@/lib/training-analytics";
+import { dataErrorMessage } from "@/lib/utils";
+import { kg } from "@/lib/utils";
+import { sessions, weights, workouts } from "@/services/data";
+import type { BodyWeight, Workout, WorkoutSession } from "@/types";
+import { useCallback, useEffect, useState } from "react";
+
+function Dashboard() {
+  const { user, profile } = useAuth();
+  const [recent, setRecent] = useState<WorkoutSession[]>([]);
+  const [monthSessions, setMonthSessions] = useState<WorkoutSession[]>([]);
+  const [plans, setPlans] = useState<Workout[]>([]);
+  const [body, setBody] = useState<BodyWeight[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    setError("");
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    try {
+      const [recentPage, currentMonth, nextPlans, nextWeights] = await Promise.all([
+        sessions.listCompletedPage(user.uid, 100),
+        sessions.listCompletedBetween(user.uid, monthStart, nextMonth),
+        workouts.list(user.uid),
+        weights.list(user.uid),
+      ]);
+      setRecent(recentPage.items);
+      setMonthSessions(currentMonth);
+      setPlans(nextPlans);
+      setBody(nextWeights);
+    } catch (reason) {
+      setError(dataErrorMessage(reason, "Verifique sua conexão e tente novamente."));
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => void load(), 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
+
+  if (!user) return <Loading/>;
+  const firstName = (profile?.name || user.displayName || user.email?.split("@")[0] || "atleta").trim().split(" ")[0];
+  const month = calculateMonthlyStats(monthSessions);
+  const streak = calculateTrainingStreak(recent);
+  const records = [...calculateExerciseRecords(recent).values()].sort((a, b) => b.maxLoadDate.getTime() - a.maxLoadDate.getTime()).slice(0, 4);
+  const nextPlan = plans.find((item) => item.active);
+
+  return <AppShell><header><p className="eyebrow">PAINEL PESSOAL</p><h1>Olá, {firstName}.</h1><p>Seu foco constrói sua evolução.</p></header>
+    {error && <ErrorState message={error} onRetry={() => void load()}/>} {loading ? <Loading/> : <>
+      <Card className="hero"><div><span>PRÓXIMO TREINO</span><h2>{nextPlan?.title || "Nenhum treino programado"}</h2><p>{nextPlan?.description || "Crie seu primeiro treino na aba Treino."}</p></div><Link className="button" href="/treino"><Play size={18}/> ABRIR TREINOS</Link></Card>
+      <div className="stat-grid"><Card><span>Treinos no mês</span><strong>{month.workouts}</strong></Card><Card><span>Volume do mês</span><strong>{Math.round(month.volume).toLocaleString("pt-BR")} kg</strong></Card><Card><span>Peso atual</span><strong>{body.length ? kg(body.at(-1)!.weight) : "—"}</strong></Card><Card><span>Sequência semanal</span><strong>{streak} {streak === 1 ? "semana" : "semanas"}</strong></Card></div>
+      <div className="split"><Card><h3>Últimos treinos</h3>{recent.length ? recent.slice(0, 4).map((item) => <div className="row" key={item.id}><span>{item.workoutName}</span><small>{item.totalSets} séries · {Math.round(item.totalVolume).toLocaleString("pt-BR")} kg</small></div>) : <Empty title="Ainda sem treino" detail="Sua primeira sessão concluída aparecerá aqui."/>}</Card>
+      <Card><h3><Trophy size={18}/> Recordes recentes</h3>{records.length ? records.map((record) => <div className="row" key={record.exerciseId}><span>{record.name}</span><small>{record.maxLoad.toLocaleString("pt-BR")} kg · {record.bestSet.reps} reps</small></div>) : <Empty title="Nenhum recorde registrado ainda" detail="Os recordes são calculados automaticamente ao finalizar séries."/>}</Card></div>
+    </>}
+  </AppShell>;
+}
+
+export default function Home() { return <Guard><Dashboard/></Guard>; }

@@ -1,3 +1,68 @@
 "use client";
-import { AppShell } from "@/components/app-shell";import { Guard } from "@/components/guard";import { Card,Empty,Loading } from "@/components/ui";import { useAuth } from "@/components/providers";import { sessions } from "@/services/data";import type { WorkoutSession } from "@/types";import { useEffect,useState } from "react";import { format } from "date-fns";
-function History(){const{user}=useAuth();const[data,setData]=useState<WorkoutSession[]>([]);useEffect(()=>{if(user)sessions.list(user.uid).then(setData)},[user]);if(!user)return <Loading/>;return <AppShell><header><p className="eyebrow">HISTÓRICO</p><h1>Cada sessão conta.</h1></header><Card><h2>Sessões recentes</h2>{data.filter(x=>x.status==='completed').length?data.filter(x=>x.status==='completed').map(x=>{const dt=(x.startedAt as unknown as {seconds:number})?.seconds;return <div className="row" key={x.id}><div><strong>{x.workoutName}</strong><small>{dt?format(new Date(dt*1000),"dd 'de' MMMM"):''}</small></div><span>{x.totalSets} séries · {Math.round(x.totalVolume).toLocaleString('pt-BR')} kg</span></div>}):<Empty title="Nenhuma sessão concluída" detail="Finalize um treino para criar seu histórico."/>}</Card></AppShell>};export default function Page(){return <Guard><History/></Guard>}
+
+import Link from "next/link";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AppShell } from "@/components/app-shell";
+import { Guard } from "@/components/guard";
+import { useAuth } from "@/components/providers";
+import { Button, Card, Empty, ErrorState, Loading } from "@/components/ui";
+import { timestampDate } from "@/lib/training-analytics";
+import { trainingStageLabel } from "@/lib/training-methods";
+import { dataErrorMessage, normalizeSearchText } from "@/lib/utils";
+import { sessions, type SessionPage } from "@/services/data";
+import type { WorkoutSession } from "@/types";
+
+const dateLabel = (value: WorkoutSession["startedAt"]) => format(timestampDate(value), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+const timeLabel = (value: WorkoutSession["endedAt"]) => value ? format(timestampDate(value), "HH:mm", { locale: ptBR }) : "—";
+
+function History() {
+  const { user } = useAuth();
+  const [data, setData] = useState<WorkoutSession[]>([]);
+  const [cursor, setCursor] = useState<SessionPage["cursor"]>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState("");
+  const [period, setPeriod] = useState("all");
+  const [workout, setWorkout] = useState("");
+  const [exercise, setExercise] = useState("");
+  const [selected, setSelected] = useState<WorkoutSession | null>(null);
+  const [referenceTime] = useState(() => Date.now());
+
+  const load = useCallback(async (reset = false) => {
+    if (!user) return;
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
+    setError("");
+    try {
+      const page = await sessions.listCompletedPage(user.uid, 20, reset ? null : cursor);
+      setData((items) => reset ? page.items : [...items, ...page.items]);
+      setCursor(page.cursor); setHasMore(page.hasMore);
+    } catch (reason) { setError(dataErrorMessage(reason, "Não foi possível carregar o histórico.")); }
+    finally { setLoading(false); setLoadingMore(false); }
+  }, [user, cursor]);
+
+  useEffect(() => { if (user) void sessions.listCompletedPage(user.uid, 20).then((page) => { setData(page.items); setCursor(page.cursor); setHasMore(page.hasMore); }).catch((reason) => setError(dataErrorMessage(reason, "Não foi possível carregar o histórico."))).finally(() => setLoading(false)); }, [user]);
+  const workoutNames = useMemo(() => [...new Set(data.map((item) => item.workoutName))].sort((a, b) => a.localeCompare(b, "pt-BR")), [data]);
+  const filtered = useMemo(() => {
+    const minimum = period === "all" ? 0 : referenceTime - Number(period) * 86400000;
+    const search = normalizeSearchText(exercise);
+    return data.filter((item) => !minimum || timestampDate(item.startedAt).getTime() >= minimum).filter((item) => !workout || item.workoutName === workout).filter((item) => !search || item.exercises.some((entry) => normalizeSearchText(entry.name).includes(search)));
+  }, [data, period, workout, exercise, referenceTime]);
+
+  if (!user) return <Loading/>;
+  return <AppShell>
+    <header><p className="eyebrow">HISTÓRICO</p><h1>Cada sessão conta.</h1><p>Consulte métodos, etapas e resultados reais dos treinos concluídos.</p></header>
+    <Card><div className="history-filters"><label>Período<select value={period} onChange={(event) => setPeriod(event.target.value)}><option value="30">30 dias</option><option value="90">90 dias</option><option value="180">6 meses</option><option value="365">1 ano</option><option value="all">Tudo carregado</option></select></label><label>Treino<select value={workout} onChange={(event) => setWorkout(event.target.value)}><option value="">Todos</option>{workoutNames.map((item) => <option key={item}>{item}</option>)}</select></label><label>Exercício<input value={exercise} onChange={(event) => setExercise(event.target.value)} placeholder="Pesquisar exercício"/></label></div></Card>
+    {error && <ErrorState message={error} onRetry={() => void load(true)}/>} {loading ? <Loading/> : <Card><h2>Sessões concluídas</h2>{filtered.length ? filtered.map((item) => <div className="history-item" key={item.id}>
+      <button className="history-summary" onClick={() => setSelected(selected?.id === item.id ? null : item)} aria-expanded={selected?.id === item.id}><span><strong>{item.workoutName}</strong><small>{dateLabel(item.startedAt)}</small></span><span>{item.totalSets} etapas · {Math.round(item.totalVolume).toLocaleString("pt-BR")} kg</span></button>
+      {selected?.id === item.id && <div className="session-detail"><div className="detail-grid"><div><small>Início</small>{dateLabel(item.startedAt)}</div><div><small>Fim</small>{timeLabel(item.endedAt)}</div><div><small>Duração</small>{item.durationSeconds == null ? "—" : `${Math.round(item.durationSeconds / 60)} min`}</div><div><small>Volume</small>{Math.round(item.totalVolume).toLocaleString("pt-BR")} kg</div></div>
+        {item.exercises.map((entry) => <section className="session-exercise" key={entry.id}><div className="actions"><h3>{entry.name} <span className="method-chip">{entry.target.methodSnapshot?.name ?? "Séries normais"}</span></h3>{entry.exerciseId && <Link className="text-button" href={`/evolucao?tab=exercicios&exerciseId=${encodeURIComponent(entry.exerciseId)}`}>Ver evolução deste exercício</Link>}</div>{entry.sets.filter((set) => set.completed).map((set) => <div className="set-history method-history-stage" key={set.id}><b>{trainingStageLabel(set)}</b><span>{set.load.toLocaleString("pt-BR")} kg</span><span>{set.durationSeconds !== undefined ? `${set.durationSeconds}s` : `${set.reps} reps`}</span><span>{Math.round(set.load * set.reps).toLocaleString("pt-BR")} kg</span>{set.rpe != null && <span>RPE {set.rpe}</span>}{set.rir != null && <span>RIR {set.rir}</span>}</div>)}</section>)}
+      </div>}
+    </div>) : <Empty title="Nenhuma sessão encontrada" detail="Ajuste os filtros ou finalize um treino."/>}{hasMore && <Button className="outline load-more" disabled={loadingMore} onClick={() => void load(false)}>{loadingMore ? "CARREGANDO..." : "CARREGAR MAIS"}</Button>}</Card>}
+  </AppShell>;
+}
+
+export default function Page() { return <Guard><History/></Guard>; }

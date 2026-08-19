@@ -6,3 +6,13 @@ export const normalizeSearchText = (text: string) => text.normalize("NFD").repla
 export const slugifyExerciseName = (name: string) => normalizeSearchText(name).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 export const parseBrazilianNumber = (value: string) => Number(value.trim().replace(",", "."));
 export const formatDateBR = (value: string) => { const [year, month, day] = value.split("-"); return year && month && day ? `${day}/${month}/${year}` : value; };
+export function dataErrorMessage(error: unknown, fallback = "Não foi possível concluir esta operação.") {
+  const code = typeof error === "object" && error !== null && "code" in error ? String(error.code).replace(/^firestore\//, "") : "";
+  if (code === "permission-denied") return "Sua conta não possui permissão para esta operação.";
+  if (code === "unauthenticated") return "Sua sessão expirou. Entre novamente.";
+  if (code === "unavailable" || code === "network-request-failed") return "Sem conexão com o servidor. Verifique sua internet e tente novamente.";
+  if (code === "failed-precondition") return "A configuração do banco ainda não está pronta para esta consulta. Publique os índices do Firestore.";
+  if (code === "resource-exhausted") return "O serviço está temporariamente ocupado. Aguarde e tente novamente.";
+  const message = error instanceof Error ? error.message : "";
+  return message && !/^(Firebase|Function|Missing or insufficient permissions)/i.test(message) ? message : fallback;
+}

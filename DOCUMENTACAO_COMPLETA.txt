@@ -1,178 +1,898 @@
-XTRAINER — DOCUMENTAÇÃO COMPLETA E ÍNDICE DE CÓDIGO-FONTE
-===========================================================
+================================================================================
+XTRAINER — DOCUMENTAÇÃO TÉCNICA, FUNCIONAL E OPERACIONAL COMPLETA
+================================================================================
 
-1. VISÃO GERAL
---------------
-XTrainer é um PWA pessoal para treino de musculação. O sistema usa Next.js
-(App Router), React, TypeScript, Firebase Authentication, Cloud Firestore,
-Firebase Storage, Recharts e GitHub Pages. A interface é responsiva e o
-projeto pode ser instalado como aplicativo compatível com PWA.
+Versão: 2.0
+Data: 18/08/2026
+Projetos: XTrainer e XTrainer-Admin
+Firebase compartilhado: xtrainer-45f8d
+Estado documentado: código-fonte local após correção estrutural e evolução funcional
 
-URL DE PRODUÇÃO
-https://gui130699.github.io/XTrainer/
+Este documento substitui a auditoria anterior. A fonte definitiva é o código dos dois
+repositórios. README.md, FIRESTORE_SCHEMA.md e CONTRATO_COMPARTILHADO.md são documentos
+operacionais complementares mantidos junto do código.
 
-REPOSITÓRIO
-https://github.com/gui130699/XTrainer
+================================================================================
+1. OBJETIVO DO PRODUTO
+================================================================================
 
-2. RECURSOS IMPLEMENTADOS
--------------------------
-- Login, logout, recuperação de senha e criação de conta.
-- Criação única do primeiro administrador.
-- Admin pode cadastrar e remover exercícios.
-- Usuário pode montar seus próprios treinos usando exercícios da biblioteca.
-- Execução de treino: carga, repetições, séries extras, volume e descanso.
-- Histórico de sessões e evolução de peso com gráfico.
-- Perfil e saudação usando o primeiro nome cadastrado.
-- Navegação mobile inferior e menu lateral no desktop.
-- Manifesto PWA, service worker e cache offline básico.
-- Deploy estático automático para GitHub Pages.
+XTrainer é um PWA pessoal de musculação. O usuário cria seus próprios treinos, executa
+séries, registra peso e avaliações e consulta evolução. O usuário não cadastra exercícios
+globais. Essa responsabilidade pertence ao XTrainer Admin.
 
-3. ARQUITETURA E DADOS
-----------------------
-Coleções Firestore:
-system/config              estado inicial e UID do administrador
-users/{uid}                perfil, papel e preferências do usuário
-exercises/{id}             biblioteca de exercícios (somente administrador)
-workouts/{id}              treino de cada usuário
-workoutSessions/{id}       snapshot de uma sessão executada
-bodyWeights/{id}           registros de peso
-physicalAssessments/{id}   estrutura para avaliações físicas
-personalRecords/{id}       estrutura para recordes
+XTrainer Admin é um PWA separado e deliberadamente pequeno. Seu escopo é:
+- consultar identificação mínima das contas cadastradas;
+- listar, pesquisar e filtrar exercícios;
+- cadastrar e editar exercícios;
+- ativar/desativar exercícios;
+- substituir o catálogo pelo dataset canônico;
+- exportar CSV;
+- registrar auditoria administrativa.
 
-Papel de acesso:
-- admin: pode administrar biblioteca de exercícios e configurações.
-- user: pode criar e operar os próprios treinos, sessões, pesos e dados.
+O Admin não possui abas de treinos, sessões, evolução ou avaliações e não recebe acesso
+às collections privadas correspondentes.
 
-4. FLUXO DO PRIMEIRO ADMINISTRADOR
-----------------------------------
-1. A tela de login consulta system/config.
-2. Se não existir administrador, mostra “PRIMEIRO ACESSO: CRIAR ADMINISTRADOR”.
-3. O cadastro cria ou reutiliza a conta existente, grava role=admin e
-   system/config { initialized: true, adminUid } em transação.
-4. Depois disso o botão deixa de aparecer.
-5. As regras Firestore impedem um segundo administrador por esse fluxo.
+================================================================================
+2. ARQUITETURA
+================================================================================
 
-5. CONFIGURAÇÃO LOCAL
----------------------
-1. Copie .env.example para .env.local.
-2. Execute npm install.
-3. Execute npm run dev.
-4. Abra http://localhost:3000.
+Frontend:
+- Next.js 16.3.1 com App Router e export estático;
+- React 19;
+- TypeScript strict;
+- CSS global responsivo/mobile-first;
+- Recharts carregado dinamicamente somente na rota de evolução;
+- Lucide para ícones;
+- date-fns para datas do histórico.
 
-Scripts:
-  npm run dev      desenvolvimento
-  npm run lint     análise ESLint
-  npm run build    build estático de produção
-  npm run start    servidor Next.js
+Backend gerenciado:
+- Firebase Authentication: e-mail/senha;
+- Cloud Firestore: perfis, catálogo, treinos, sessões e evolução;
+- Firebase Storage: foto de perfil e fotos opcionais de avaliação;
+- Firestore persistentLocalCache com múltiplas abas.
 
-Publicação das regras Firebase:
-  firebase deploy --only firestore:rules,firestore:indexes --project xtrainer-45f8d
-  firebase deploy --only storage --project xtrainer-45f8d
+Hospedagem:
+- GitHub Pages;
+- XTrainer em /XTrainer;
+- Admin em /XTrainer-Admin;
+- output: export;
+- trailingSlash: true.
 
-Observação: o Storage deve ser ativado uma vez no Firebase Console antes do
-primeiro deploy das regras de Storage.
+Não existe servidor próprio, Service Account, Admin SDK ou segredo privado no bundle.
+Operações privilegiadas futuras devem usar Cloud Functions ou outro ambiente confiável.
 
-6. ESTRUTURA COMPLETA DO CÓDIGO-FONTE
--------------------------------------
-package.json                         dependências e scripts
-next.config.ts                       exportação estática GitHub Pages
-firebase.json                        configuração Firebase CLI
-firestore.rules                      autorização Firestore
-storage.rules                        autorização Storage
-firestore.indexes.json               índices das consultas
-public/manifest.webmanifest          metadados PWA
-public/sw.js                         cache/service worker
-public/icon.svg                      ícone PWA
-.github/workflows/deploy-pages.yml   CI/CD do GitHub Pages
-src/app/layout.tsx                   layout raiz e metadados
-src/app/globals.css                  tema e responsividade
-src/app/page.tsx                     dashboard
-src/app/login/page.tsx               login/cadastro/primeiro admin
-src/app/treino/page.tsx              criação e execução de treino
-src/app/evolucao/page.tsx            gráfico de peso
-src/app/historico/page.tsx           histórico de sessões
-src/app/perfil/page.tsx              perfil e administração
-src/app/admin/page.tsx               biblioteca de exercícios/admin
-src/components/app-shell.tsx         navegação principal
-src/components/providers.tsx         sessão Firebase e cache PWA
-src/components/guard.tsx             proteção de rotas
-src/components/ui.tsx                componentes reutilizáveis
-src/lib/firebase.ts                  instâncias Firebase
-src/lib/utils.ts                     utilitários
-src/services/auth.ts                 autenticação e perfis
-src/services/data.ts                 persistência Firestore
-src/types/index.ts                   contratos TypeScript
+================================================================================
+3. REPOSITÓRIOS E CONTRATO COMPARTILHADO
+================================================================================
 
-7. CÓDIGO-FONTE — CONFIGURAÇÃO PRINCIPAL
------------------------------------------
-ARQUIVO: next.config.ts
-import type { NextConfig } from "next";
-const isGitHubPages = process.env.GITHUB_ACTIONS === "true";
-const nextConfig: NextConfig = {
-  reactStrictMode: true, output: "export", trailingSlash: true,
-  typescript: { ignoreBuildErrors: true }, eslint: { ignoreDuringBuilds: true },
-  basePath: isGitHubPages ? "/XTrainer" : "",
-  assetPrefix: isGitHubPages ? "/XTrainer/" : undefined,
-};
-export default nextConfig;
+Repositório principal:
+C:\Users\guilh\OneDrive\HP Guilherme Notebook\Área de Trabalho\XTrainer
 
-ARQUIVO: src/lib/firebase.ts
-import { getApp, getApps, initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
-const config = { apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyBI1sPxggPRkZwIV4zaPavk7gOECAsDi9s", authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "xtrainer-45f8d.firebaseapp.com", projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "xtrainer-45f8d", storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "xtrainer-45f8d.firebasestorage.app", messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "204702937283", appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:204702937283:web:719cda9778e7a45669f276" };
-export const app = getApps().length ? getApp() : initializeApp(config);
-export const auth = getAuth(app);
-export const db = (() => { try { return initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); } catch { return getFirestore(app); } })();
-export const storage = getStorage(app);
+Repositório administrativo:
+C:\Users\guilh\OneDrive\HP Guilherme Notebook\Área de Trabalho\XTrainer-Admin
 
-8. CÓDIGO-FONTE — REGRAS DE SEGURANÇA
---------------------------------------
-ARQUIVO: firestore.rules
-rules_version = '2';
-service cloud.firestore { match /databases/{database}/documents {
-  function signedIn() { return request.auth != null; }
-  function isAdmin() { return signedIn() && get(/databases/$(database)/documents/system/config).data.adminUid == request.auth.uid; }
-  match /system/config { allow read: if true; allow create: if signedIn() && !exists(/databases/$(database)/documents/system/config); allow update, delete: if isAdmin(); }
-  match /users/{uid} {
-    allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
-    allow create: if signedIn() && request.auth.uid == uid && (request.resource.data.role == 'user' || (!exists(/databases/$(database)/documents/system/config) && request.resource.data.role == 'admin'));
-    allow update: if isAdmin() || (signedIn() && request.auth.uid == uid && (request.resource.data.role == resource.data.role || (!exists(/databases/$(database)/documents/system/config) && request.resource.data.role == 'admin')));
-    allow delete: if isAdmin();
-  }
-  match /exercises/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
-  match /workouts/{id} { allow read: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid); allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid; allow update, delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId); }
-  match /{collection}/{id} { allow read, write: if signedIn() && resource.data.ownerId == request.auth.uid; allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid; }
-} }
+Arquivos obrigatoriamente sincronizados:
+- firestore.rules
+- firestore.indexes.json
+- storage.rules
+- src/types/index.ts
+- src/data/default-exercises.ts
 
-9. CÓDIGO-FONTE — SERVIÇOS
----------------------------
-ARQUIVO: src/services/data.ts (resumo funcional completo)
-- exercises.list/save/remove: biblioteca Firestore.
-- workouts.list/save: treinos pertencentes ao ownerId.
-- weights.list/save/remove: peso corporal.
-- assessments.list/save: avaliações físicas.
-- sessions.list/get/start/save: sessão com snapshot de exercícios e séries.
+Validação:
+npm run check:firebase-contract
 
-O código-fonte íntegro e editável de cada módulo listado na seção 6 está no
-repositório. Este arquivo funciona como documentação técnica e índice de
-implementação; para evitar duplicação e divergência, a fonte canônica é cada
-arquivo TypeScript/CSS/JSON indicado acima.
+O script aceita FIREBASE_CONTRACT_PEER para CI. Cada workflow baixa o repositório irmão,
+compara os cinco artefatos e bloqueia a publicação se existir drift.
 
-10. CI/CD
-----------
-O workflow .github/workflows/deploy-pages.yml executa em todo push na main:
-1. checkout; 2. Node 22; 3. npm ci; 4. npm run build; 5. upload de out;
-6. actions/deploy-pages. O Pages está configurado no modo GitHub Actions.
+Fonte operacional do catálogo: XTrainer Admin.
+Regra de segurança: qualquer mudança de contrato precisa funcionar nos dois aplicativos
+antes de publicar no Firebase.
 
-11. LIMITAÇÕES ATUAIS E PRÓXIMAS EVOLUÇÕES
-------------------------------------------
-- O formulário de novo treino cria inicialmente um exercício; a estrutura já
-  suporta múltiplos e pode receber interface de reordenação.
-- Storage foi preparado nas regras, mas deve ser ativado no Console antes de
-  fotos de evolução.
-- Avaliações e recordes possuem tipos/coleções preparados, com expansão de
-  telas pendente.
-- O código de produção deve remover ignoreBuildErrors/ignoreDuringBuilds após
-  a revisão total de tipagem e lint.
+================================================================================
+4. MAPA DE ROTAS — XTRAINER
+================================================================================
+
+/: Dashboard pessoal
+- saudação pelo primeiro nome do perfil/Auth/e-mail;
+- treinos do mês atual e ano atual;
+- séries concluídas no mês;
+- volume mensal;
+- sequência semanal;
+- próximo treino ativo;
+- recordes derivados das sessões concluídas.
+
+/login: Autenticação
+- entrar;
+- cadastrar usuário comum;
+- recuperar senha;
+- erros Firebase traduzidos;
+- link para o PWA administrativo.
+
+/treino: Treinos e sessão
+- biblioteca somente leitura;
+- criação de treino com botão Adicionar exercício;
+- lista progressiva dos exercícios adicionados;
+- edição de séries, faixa de reps, descanso, carga sugerida, notas e ordem;
+- duplicar, arquivar, restaurar e excluir treino;
+- iniciar, retomar, executar, finalizar ou cancelar sessão;
+- status de sincronização;
+- resumo final e recordes novos.
+
+/historico: Histórico
+- somente status completed;
+- ordenação startedAt DESC;
+- paginação por cursor;
+- filtros por período, treino e exercício;
+- datas DD/MM/AAAA às HH:mm;
+- detalhe de início, fim, duração, volume, exercícios e sets;
+- link para evolução do exercício.
+
+/evolucao: Evolução
+- abas Resumo, Peso, Avaliações, Medidas, Avançada e Exercícios;
+- peso com CRUD, gráfico e filtros 30/90/180/365/tudo;
+- avaliações rápidas, completas e avançadas;
+- comparação corporal;
+- gráficos de medidas;
+- progressão por exercício executado.
+
+/perfil: Perfil
+- nome, altura, objetivo, nascimento, sexo e foto opcionais;
+- e-mail somente leitura;
+- atualização imediata do contexto/Auth displayName;
+- troca de senha com reautenticação da senha atual;
+- logout.
+
+Rota removida:
+- /admin não existe mais no aplicativo principal.
+
+================================================================================
+5. MAPA DE ROTAS — XTRAINER ADMIN
+================================================================================
+
+/login:
+- Firebase Authentication;
+- acesso somente quando UID == system/config.adminUid;
+- conta comum é rejeitada/desconectada.
+
+/:
+- contagem de usuários;
+- total de exercícios;
+- exercícios ativos;
+- explicação explícita do escopo.
+
+/usuarios:
+- pesquisa por nome, e-mail e UID;
+- mostra nome, e-mail, UID, papel e data de cadastro;
+- não mostra altura, objetivo, sexo, nascimento, foto ou dados corporais;
+- não lista diretamente Firebase Authentication, apenas users/{uid}.
+
+/exercicios:
+- pesquisa por nome, inglês e aliases;
+- filtros grupo/status;
+- cadastrar/editar;
+- abrir vídeo;
+- botão compacto de ativar/desativar;
+- substituir completamente o catálogo pelos 202 canônicos, com modal de confirmação;
+- exportar lista filtrada em CSV;
+- proteção CSV Injection prefixando células iniciadas por =, +, - ou @;
+- indicação para URLs que abrem pesquisas do YouTube;
+- aviso visível se auditLogs falhar.
+
+================================================================================
+6. AUTENTICAÇÃO E AUTORIZAÇÃO
+================================================================================
+
+Cadastro normal:
+1. createUserWithEmailAndPassword;
+2. users/{uid} com uid/name/email/role user/createdAt;
+3. Firebase Auth displayName atualizado;
+4. se a gravação do perfil falhar, tenta excluir a conta Auth recém-criada;
+5. usuário autenticado segue ao dashboard.
+
+Administrador:
+- não existe botão de criar primeiro admin;
+- não existe bootstrap público;
+- role do documento não concede autorização;
+- admin efetivo é o UID em system/config.adminUid;
+- system/config é somente leitura para clientes.
+
+Provisionamento manual obrigatório:
+documento: system/config
+initialized: true
+adminUid: UID_REAL_DO_ADMIN
+updatedAt: Timestamp opcional
+
+Erros conhecidos traduzidos:
+- e-mail já usado;
+- e-mail inválido;
+- senha fraca;
+- credencial inválida;
+- senha atual incorreta;
+- login recente necessário;
+- falha de rede;
+- permission denied.
+
+================================================================================
+7. SECURITY RULES — FIRESTORE
+================================================================================
+
+Funções centrais:
+- signedIn(): request.auth != null;
+- isAdmin(): system/config.adminUid == request.auth.uid;
+- ownsExisting(): resource.data.ownerId == request.auth.uid;
+- createsForSelf(): request.resource.data.ownerId == request.auth.uid;
+- preservesOwner(): ownerId não muda.
+
+Política por collection:
+- system/config: read true; create/update/delete false;
+- users: próprio usuário ou admin lê; usuário cria role user; edita whitelist;
+- exercises: autenticado lê; admin cria/edita/exclui;
+- workouts: somente owner;
+- workoutSessions: somente owner + validação de status/ID/transição;
+- bodyWeights: somente owner + peso positivo;
+- physicalAssessments: somente owner + campos tipados;
+- auditLogs: admin lê/cria; update/delete negados;
+- qualquer outra collection: negada por não existir match permissivo.
+
+Validação de sessão:
+- documento active precisa ser active-{request.auth.uid};
+- completed/cancelled pode usar ID histórico;
+- ownerId é imutável;
+- completed/cancelled não retorna a active;
+- payload aceita somente os campos declarados.
+
+Validação testada no emulador:
+- cliente não cria/troca system/config;
+- usuário não se promove a admin;
+- usuário não lê dados de outro;
+- usuário não escreve exercícios;
+- ownerId não muda;
+- active aleatória é negada;
+- histórico não reabre;
+- avaliação parcial tem CRUD apenas pelo dono;
+- admin não lê collections privadas;
+- audit log é imutável;
+- collection desconhecida é negada.
+
+================================================================================
+8. STORAGE RULES E FOTOS
+================================================================================
+
+Caminhos permitidos:
+- users/{uid}/profile/{fileName}
+- users/{uid}/assessments/{assessmentId}/{fileName}
+
+Regras:
+- somente request.auth.uid == uid;
+- leitura privada pelo owner;
+- create/update somente image/*;
+- tamanho menor que 8 MiB;
+- exclusão somente pelo owner;
+- nenhuma regra catch-all.
+
+O Admin não lê fotos. Upload de avaliação é opcional. Se uma foto falhar, a avaliação
+continua salva e a tela informa quais views falharam.
+
+================================================================================
+9. SCHEMA FIRESTORE
+================================================================================
+
+Collections oficiais:
+1. system/config
+2. users
+3. exercises
+4. workouts
+5. workoutSessions
+6. bodyWeights
+7. physicalAssessments
+8. auditLogs
+
+Definição completa de campos, tipos, opcionalidade, ownership e índices:
+FIRESTORE_SCHEMA.md
+
+Não existe PersonalRecords/personalRecords. Analytics é derivado.
+
+Índices:
+- sessions ownerId + startedAt desc;
+- sessions ownerId + status;
+- sessions ownerId + status + startedAt desc;
+- weights ownerId + date asc;
+- assessments ownerId + date desc.
+
+================================================================================
+10. BIBLIOTECA DE EXERCÍCIOS
+================================================================================
+
+Dataset:
+- exatamente 202 exercícios;
+- IDs determinísticos preservados;
+- sortOrder 1 a 202 sem lacunas;
+- nomes normalizados únicos;
+- URLs HTTPS de pesquisa do YouTube em português;
+- todas as buscas usam “execução correta musculação em português”;
+- 18 grupos musculares do catálogo;
+- aliases opcionais.
+
+Substituição do catálogo:
+- valida o dataset antes de escrever;
+- lotes abaixo do limite Firestore;
+- sobrescreve integralmente os 202 documentos canônicos;
+- preserva apenas createdAt dos IDs já existentes;
+- define os 202 documentos como ativos conforme o CSV;
+- remove qualquer exercício fora da nova lista;
+- preserva IDs usados por treinos e históricos;
+- retorna total/created/updated/deleted/skipped/errors;
+- registra audit log no Admin.
+
+Links de vídeo:
+- os 202 links foram substituídos pelos valores do CSV fornecido;
+- todos abrem buscas em português no YouTube;
+- nenhuma URL direta fictícia foi criada;
+- o importador valida os 202 links antes de gerar o catálogo.
+
+================================================================================
+11. TREINOS DO USUÁRIO
+================================================================================
+
+O usuário pode montar treinos; não pode cadastrar Exercise global.
+
+Fluxo do builder:
+1. Novo treino;
+2. nome/título/descrição;
+3. pesquisar biblioteca;
+4. Adicionar exercício;
+5. exercício cai na lista de adicionados;
+6. configurar sets/reps/descanso/carga/notas;
+7. reordenar/remover;
+8. Criar treino/Salvar alterações.
+
+DTO de escrita exclui id e timestamps de leitura. Workout armazena snapshot mínimo de
+nome/configuração e exerciseId estável.
+
+Estados:
+- active true: aparece em treinos ativos e pode iniciar;
+- active false: aparece em arquivados;
+- restaurar volta active true;
+- excluir remove o plano, mas não as sessões históricas.
+
+================================================================================
+12. SESSÃO ATIVA E SINCRONIZAÇÃO
+================================================================================
+
+ID ativo: active-{uid}.
+
+Início:
+- transaction.get do ID fixo;
+- se existir, erro amigável de sessão já em andamento;
+- se não existir, transaction.set com serverTimestamp;
+- a UI recebe snapshot local imediatamente.
+
+Retrocompatibilidade:
+- primeiro procura o ID fixo;
+- depois consulta sessões antigas ownerId/status active;
+- transação move a primeira para o ID fixo;
+- duplicatas antigas são canceladas;
+- nada é migrado destrutivamente em lote.
+
+Durante a sessão:
+- digitação de carga/reps é local;
+- sincronização ocorre em blur e em ações relevantes;
+- concluir/desfazer/adicionar/remover set persiste estado;
+- status: alterações locais, salvando, salvo, erro, offline;
+- erro oferece tentativa novamente;
+- nenhuma write é disparada em cada tecla.
+
+Descanso:
+- persiste restEndsAt Timestamp;
+- contador é derivado de restEndsAt - relógio atual;
+- recarregar página recupera o tempo restante;
+- pular remove o campo;
+- +15s altera o timestamp final.
+
+Finalização:
+- transaction lê active;
+- cria histórico completed com auto-ID;
+- endedAt usa serverTimestamp;
+- duração é calculada desde startedAt;
+- remove documento active;
+- abre resumo com duração, volume, sets, exercícios e recordes.
+
+Cancelamento:
+- cria histórico cancelled;
+- remove active na mesma transação;
+- cancelled não entra no dashboard, histórico completed ou analytics.
+
+================================================================================
+13. HISTÓRICO E DASHBOARD
+================================================================================
+
+Query canônica de histórico:
+ownerId == uid
+status == completed
+orderBy startedAt desc
+limit 20/100
+startAfter cursor
+
+Dashboard mensal usa intervalo do primeiro dia do mês ao primeiro dia do próximo mês.
+Compara mês e ano, evitando misturar agosto de anos diferentes.
+
+Métricas:
+- workouts: quantidade de sessões completed do mês;
+- sets: totalSets dessas sessões;
+- volume: totalVolume dessas sessões;
+- streak: semanas consecutivas com treino, começando na atual ou na imediatamente anterior;
+- records: máximos calculados do histórico carregado.
+
+Estados loading/error/empty são separados. Erros de permissão, rede, autenticação e
+índice faltante são convertidos para instruções compreensíveis.
+
+================================================================================
+14. EVOLUÇÃO CORPORAL E AVALIAÇÕES
+================================================================================
+
+Peso:
+- registrar, editar e excluir;
+- data, kg, observação;
+- origem manual ou assessment;
+- gráfico e histórico;
+- filtros 30/90/180/365/tudo;
+- fonte canônica bodyWeights.
+
+Avaliação rápida:
+- data;
+- peso, altura, gordura, massa gorda e massa magra opcionais;
+- observação;
+- opção de também registrar peso oficial.
+
+Avaliação completa:
+- todos os campos rápidos;
+- medidas corporais agrupadas;
+- nenhum campo corporal é obrigatório.
+
+Avaliação avançada:
+- medidas;
+- dobras cutâneas;
+- protocolo;
+- fotos frente/lateral/costas;
+- não calcula percentual de gordura com fórmula inventada.
+
+Comparação:
+- escolhe Avaliação A e B;
+- mostra valor anterior, posterior e diferença;
+- compara somente campos presentes em ambas;
+- unidades kg, %, cm ou mm.
+
+Readers aceitam documentos antigos sem type/measurements/skinfolds/fatMass/source.
+
+================================================================================
+15. ANALYTICS E EVOLUÇÃO POR EXERCÍCIO
+================================================================================
+
+Fonte única: workoutSessions status completed.
+
+Identidade:
+- exerciseId é chave primária;
+- snapshots antigos sem ID usam fallback cauteloso legacy:nome-normalizado;
+- nome é exibido, não usado como chave normal quando há ID.
+
+Somente sets completed entram nos cálculos.
+
+Fórmulas:
+- volume do set = load * reps;
+- volume da sessão/exercício = soma dos sets concluídos;
+- carga máxima = maior load concluído;
+- repetições máximas = maior reps de um set concluído;
+- melhor série = maior carga; em empate, maior reps;
+- evolução absoluta = atual - primeiro;
+- evolução percentual = (atual - primeiro) / primeiro * 100;
+- se primeiro == 0, percentual é null para evitar divisão inválida.
+
+Recordes derivados:
+- maior carga;
+- maior número de reps;
+- maior volume em uma sessão;
+- melhor série;
+- data de cada marco.
+
+Não existe cadastro manual de PR. O resumo de treino detecta novos recordes comparando
+a sessão finalizada com as sessões anteriores.
+
+================================================================================
+16. PERFIL E PRIVACIDADE
+================================================================================
+
+Perfil editável pelo dono:
+- nome;
+- altura;
+- objetivo;
+- nascimento;
+- sexo;
+- foto.
+
+E-mail é somente leitura na tela. Senha exige a senha atual e reautenticação Firebase.
+Após salvar, Providers recarrega o perfil e sincroniza displayName/photoURL do Auth.
+
+Dados privados:
+- workouts;
+- workoutSessions;
+- bodyWeights;
+- physicalAssessments;
+- fotos no Storage.
+
+Admin não tem permissão Firestore para as quatro collections privadas e não recebe
+permissão Storage para arquivos de outro UID.
+
+================================================================================
+17. PWA, CACHE E OFFLINE
+================================================================================
+
+Ambos possuem:
+- manifest.webmanifest;
+- ícones 192 e 512;
+- display standalone;
+- metadata/appleWebApp;
+- botão de instalação;
+- ajuda no iOS via Compartilhar > Adicionar à Tela de Início;
+- service worker com navegação network-first e cache fallback.
+
+Identidade visual do PWA de usuário:
+- xtrainer-user-icon-192.png: ícone interno, favicon e Apple Touch Icon;
+- xtrainer-user-icon-512.png: ícone de alta resolução para instalação;
+- xtrainer-user-icon-maskable-512.png: variante com margem segura para launchers adaptativos;
+- AppLogo exibe o mesmo ícone no login, na barra lateral desktop e no topo mobile.
+
+Identidade visual do PWA administrativo:
+- xtrainer-admin-icon-192.png: ícone interno, favicon e Apple Touch Icon;
+- xtrainer-admin-icon-512.png: ícone de alta resolução para instalação;
+- xtrainer-admin-icon-maskable-512.png: variante com margem segura para launchers adaptativos;
+- AdminAppLogo exibe o ícone com escudo no login, na barra lateral e no topo mobile.
+
+Isolamento:
+- usuário: xtrainer-user-v5;
+- admin: xtrainer-admin-v2;
+- activate remove somente caches com o próprio prefixo.
+
+Firestore usa persistentLocalCache/multipleTabManager. A UI informa offline/sync para a
+sessão. Operações que exigem confirmação do servidor podem continuar pendentes ou falhar;
+o sistema não promete offline total.
+
+================================================================================
+18. TRATAMENTO ASSÍNCRONO E ERROS
+================================================================================
+
+Padrão adotado:
+- loading durante request;
+- error com texto humano e retry nas cargas principais;
+- empty somente depois de load bem-sucedido;
+- success separado de error;
+- botões desabilitados durante gravação;
+- falha de analytics não desfaz treino já salvo;
+- falha de foto não desfaz avaliação já salva;
+- falha de audit log gera warning visível;
+- URLs/erros internos Firebase não são expostos quando reconhecidos.
+
+O modal reutilizável começou a substituir confirm nativo em ações administrativas
+importantes. Confirmações legadas restantes podem migrar gradualmente sem alterar regras.
+
+================================================================================
+19. RETROCOMPATIBILIDADE
+================================================================================
+
+Arquivo: src/lib/compatibility.ts
+
+Normalizadores:
+- normalizeExerciseDocument;
+- normalizeWorkoutDocument;
+- normalizeWorkoutSessionDocument;
+- normalizeBodyWeightDocument;
+- normalizeAssessmentDocument.
+
+Comportamentos:
+- exercise antigo sem active é considerado ativo;
+- workout antigo usa name como title e arrays vazios seguros;
+- session antiga recompõe IDs locais, volume, totalSets e status;
+- weight antigo aceita ausência de source;
+- assessment antiga infere type e measurements {};
+- nenhum campo novo exige migração imediata.
+
+================================================================================
+20. TESTES AUTOMATIZADOS
+================================================================================
+
+Testes unitários XTrainer: 11 aprovados.
+
+Cobertura:
+- volume apenas de sets concluídos;
+- melhor série;
+- recordes/carga/reps/volume;
+- histórico por exerciseId;
+- detecção de novo recorde;
+- mês + ano;
+- streak semanal;
+- divisão por zero;
+- integridade do dataset de 202 exercícios;
+- readers de documentos antigos;
+- avaliação parcial e comparação.
+
+Security Rules: 9 aprovados em cada repositório.
+
+Contrato compartilhado: 5 arquivos equivalentes.
+
+Ferramentas:
+- node:test;
+- tsx;
+- @firebase/rules-unit-testing;
+- Firebase Firestore Emulator;
+- Java 21 no CI.
+
+================================================================================
+21. CI/CD
+================================================================================
+
+Workflow de cada repositório:
+1. checkout;
+2. Node 22;
+3. Java 21;
+4. npm ci;
+5. npm run lint;
+6. npm run typecheck;
+7. npm test;
+8. checkout do repositório irmão;
+9. npm run check:firebase-contract;
+10. remoção do checkout auxiliar;
+11. npm run build;
+12. upload de out;
+13. deploy GitHub Pages.
+
+Secrets necessários:
+- NEXT_PUBLIC_FIREBASE_API_KEY
+- NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+- NEXT_PUBLIC_FIREBASE_PROJECT_ID
+- NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+- NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+- NEXT_PUBLIC_FIREBASE_APP_ID
+
+Domínio autorizado no Firebase Auth:
+gui130699.github.io
+
+================================================================================
+22. DEPENDÊNCIAS E SEGURANÇA DE SUPPLY CHAIN
+================================================================================
+
+Next foi atualizado de 15 para 16.3.1 para corrigir vulnerabilidades de produção em
+PostCSS/Sharp. eslint-config-next e configuração flat foram atualizados junto.
+
+npm audit --omit=dev:
+- XTrainer: 0 vulnerabilidades;
+- XTrainer Admin: 0 vulnerabilidades.
+
+O audit completo mantém 5 avisos moderados transitivos no firebase-tools de desenvolvimento.
+O npm sugere uma mudança forçada/downgrade incompatível; ela não foi aplicada. firebase-tools
+não integra o bundle de produção.
+
+================================================================================
+23. APP CHECK
+================================================================================
+
+App Check é recomendado como defesa adicional, não substituto de Rules.
+
+Procedimento manual sugerido:
+1. Console Firebase > App Check;
+2. registrar os dois clientes web;
+3. configurar reCAPTCHA Enterprise ou provedor apropriado;
+4. adicionar as chaves públicas necessárias como secrets;
+5. liberar primeiro em modo monitoramento;
+6. observar tráfego legítimo de Pages/PWA;
+7. só então aplicar enforcement em Firestore/Storage/Auth compatível;
+8. documentar rollback.
+
+Nenhuma ativação remota foi feita automaticamente.
+
+================================================================================
+24. DEPLOY FIREBASE — AÇÃO MANUAL
+================================================================================
+
+GitHub Pages NÃO publica Rules, indexes ou Storage Rules.
+
+Depois de revisar projeto e diff:
+firebase deploy --only firestore:rules,firestore:indexes,storage --project xtrainer-45f8d
+
+Antes:
+- confirmar login Firebase CLI;
+- confirmar projeto xtrainer-45f8d;
+- criar backup/export quando aplicável;
+- validar rules no emulator;
+- confirmar Storage habilitado;
+- conferir índices.
+
+Depois:
+- testar cadastro user;
+- testar login user/admin;
+- testar biblioteca;
+- criar e concluir sessão;
+- testar histórico/evolução;
+- testar isolamento com duas contas;
+- monitorar erros.
+
+Este trabalho não executou deploy Firebase, commit, push ou publicação Pages.
+
+================================================================================
+25. INVENTÁRIO DO CÓDIGO-FONTE PRINCIPAL
+================================================================================
+
+Configuração:
+- package.json: scripts/dependências;
+- next.config.ts: export/basePath;
+- tsconfig.json: TypeScript strict/Next 16;
+- eslint.config.mjs: ESLint flat;
+- firebase.json: Rules/indexes/storage;
+- firestore.rules;
+- firestore.indexes.json;
+- storage.rules;
+- .github/workflows/deploy-pages.yml.
+
+Aplicação XTrainer:
+- src/app/layout.tsx
+- src/app/page.tsx
+- src/app/login/page.tsx
+- src/app/treino/page.tsx
+- src/app/historico/page.tsx
+- src/app/evolucao/page.tsx
+- src/app/perfil/page.tsx
+- src/app/globals.css
+- src/components/app-shell.tsx
+- src/components/assessment-form.tsx
+- src/components/evolution-chart.tsx
+- src/components/guard.tsx
+- src/components/install-app-button.tsx
+- src/components/app-logo.tsx
+- src/components/providers.tsx
+- src/components/ui.tsx
+- src/services/auth.ts
+- src/services/data.ts
+- src/lib/firebase.ts
+- src/lib/utils.ts
+- src/lib/training-analytics.ts
+- src/lib/body-assessments.ts
+- src/lib/compatibility.ts
+- src/types/index.ts
+- src/data/default-exercises.ts
+- public/manifest.webmanifest
+- public/sw.js
+- public/xtrainer-user-icon-192.png
+- public/xtrainer-user-icon-512.png
+- public/xtrainer-user-icon-maskable-512.png
+- tests/training-analytics.test.ts
+- tests/compatibility.test.ts
+- tests/firestore.rules.test.mjs
+- scripts/check-firebase-contract.mjs.
+
+Aplicação Admin:
+- src/app/layout.tsx
+- src/app/login/page.tsx
+- src/app/page.tsx
+- src/app/usuarios/page.tsx
+- src/app/exercicios/page.tsx
+- src/app/globals.css
+- src/components/admin-shell.tsx
+- src/components/admin-app-logo.tsx
+- src/components/install-app-button.tsx
+- src/components/providers.tsx
+- src/components/ui.tsx
+- src/services/auth.ts
+- src/services/data.ts
+- src/lib/firebase.ts
+- src/lib/utils.ts
+- src/types/index.ts
+- src/data/default-exercises.ts
+- public/manifest.webmanifest
+- public/sw.js
+- public/xtrainer-admin-icon-192.png
+- public/xtrainer-admin-icon-512.png
+- public/xtrainer-admin-icon-maskable-512.png
+- tests/firestore.rules.test.mjs
+- scripts/check-firebase-contract.mjs
+- scripts/replace-default-exercises-from-csv.mjs
+- scripts/replace-firestore-exercises.mjs.
+
+O código-fonte integral está nesses arquivos versionados. Esta documentação evita duplicar
+milhares de linhas literais para não criar uma terceira cópia divergente; registra contrato,
+responsabilidades, fórmulas, fluxos e localização exata de cada implementação.
+
+================================================================================
+26. COMANDOS OPERACIONAIS
+================================================================================
+
+Instalação:
+npm install
+
+Desenvolvimento:
+npm run dev
+
+Qualidade:
+npm run lint
+npm run typecheck
+npm test
+npm run check:firebase-contract
+npm run build
+
+Testes separados XTrainer:
+npm run test:unit
+npm run test:rules
+
+Auditoria somente produção:
+npm audit --omit=dev
+
+================================================================================
+27. VERIFICAÇÃO EXECUTADA EM 18/08/2026
+================================================================================
+
+XTrainer:
+- npm install: concluído;
+- npm run lint: sucesso, 0 erros, 0 avisos;
+- npm run typecheck: sucesso;
+- testes unitários: 11/11;
+- Rules: 9/9;
+- contrato: 5/5 arquivos equivalentes;
+- npm run build com basePath /XTrainer: sucesso;
+- rotas estáticas geradas: /, /login, /treino, /historico, /evolucao, /perfil;
+- login/cadastro inspecionados em desktop e 390 px, sem overflow ou erro no console;
+- npm audit --omit=dev: 0 vulnerabilidades.
+
+XTrainer Admin:
+- npm install: concluído;
+- npm run lint: sucesso, 0 erros, 0 avisos;
+- npm run typecheck: sucesso;
+- Rules: 9/9;
+- contrato: 5/5 arquivos equivalentes;
+- npm run build com basePath /XTrainer-Admin: sucesso;
+- rotas estáticas geradas: /, /login, /usuarios, /exercicios;
+- login administrativo inspecionado em desktop e 390 px, sem overflow ou erro no console;
+- npm audit --omit=dev: 0 vulnerabilidades.
+
+================================================================================
+28. LIMITAÇÕES E PRÓXIMOS PASSOS
+================================================================================
+
+Ações manuais ainda necessárias:
+- provisionar/conferir system/config;
+- configurar secrets no GitHub;
+- autorizar domínio no Firebase Authentication;
+- habilitar Storage se ainda não estiver ativo;
+- publicar Rules/indexes/storage após revisão;
+- configurar App Check gradualmente;
+- fazer smoke test real com duas contas e um admin;
+- executar os workflows após push.
+
+Limitações conscientes:
+- frontend não lista/exclui contas de Firebase Authentication;
+- offline é parcial, não garantia de todas as mutações;
+- links de vídeo são pesquisas do YouTube, não vídeos diretos fixos;
+- histórico completo para analytics pode exigir carregamento adicional;
+- App Check não foi ativado remotamente;
+- confirmações nativas restantes podem migrar para o modal reutilizável;
+- nenhuma fórmula clínica/profissional de gordura corporal é calculada.
+
+================================================================================
+21. SISTEMA DINÂMICO DE MÉTODOS DE TREINO (18/08/2026)
+================================================================================
+
+O catálogo global trainingMethods contém 24 métodos padrão e aceita métodos personalizados seguros criados pelo Admin. Cada definição possui categoria, motor, capacidades, regras, esquema de campos, padrões, ordem, estado e versão.
+
+O usuário seleciona somente métodos ativos ao montar o treino. WorkoutExercise e WorkoutExerciseGroup gravam methodConfig e methodSnapshot. A sessão copia esses snapshots e gera TrainingSet detalhado com bloco, etapa, papel, duração, cadência, descanso e indicador de falha quando aplicável. Treinos antigos sem método continuam como Séries normais.
+
+Motores disponíveis: normal, group, drop, rest-pause, cluster, progression, top-backoff, tempo, failure, amrap, isometric, partials, myo-reps e time.
+
+O Admin possui as rotas /metodos e /sistema. /metodos oferece filtros, indicadores, wizard visual, edição de esquema seguro, padrões, duplicação, ordem, ativação/desativação, sincronização idempotente e auditoria. Não são aceitos JavaScript, HTML nem eval.
+
+Grupos de exercício usam WorkoutExerciseGroup, groupId e groupPosition. A execução é exibida por rodada. O descanso entre exercícios e o descanso após a rodada são independentes; o descanso longo ocorre somente depois do último membro.
+
+Analytics contam todas as etapas especiais concluídas, mas excluem aquecimento e aproximação de métricas efetivas e recordes. O histórico mantém todos os dados.
+
+As regras do Firestore permitem leitura de trainingMethods somente a autenticados e escrita apenas ao administrador. Os 24 padrões e as regras foram publicados no projeto xtrainer-45f8d.
+
+Detalhes técnicos, arquivos e resultados de testes: RELATORIO_IMPLEMENTACAO_METODOS.md.
+
+================================================================================
+FIM DA DOCUMENTAÇÃO
+================================================================================

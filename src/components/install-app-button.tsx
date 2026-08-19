@@ -31,10 +31,11 @@ export function InstallAppButton() {
       setShowIosHelp(false);
     };
 
-    setIsIos(/iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+    const detectionTimer = window.setTimeout(() => setIsIos(/iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)), 0);
     window.addEventListener("beforeinstallprompt", handlePrompt);
     window.addEventListener("appinstalled", handleInstalled);
     return () => {
+      window.clearTimeout(detectionTimer);
       window.removeEventListener("beforeinstallprompt", handlePrompt);
       window.removeEventListener("appinstalled", handleInstalled);
     };
