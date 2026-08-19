@@ -62,11 +62,22 @@ function Work() {
     setLoading(true);
     setLoadError("");
     try {
-      const [nextPlans, nextActive, nextLibrary, nextMethods] = await Promise.all([workouts.list(uid), sessions.getActive(uid), exercises.list(), trainingMethodsService.list()]);
-      setPlans(nextPlans);
-      setActive(nextActive);
-      setLibrary(nextLibrary);
-      setMethods(nextMethods.length ? nextMethods : [normalTrainingMethod()]);
+      const [plansResult, activeResult, libraryResult, methodsResult] = await Promise.allSettled([
+        workouts.list(uid),
+        sessions.getActive(uid),
+        exercises.list(),
+        trainingMethodsService.list(),
+      ]);
+
+      if (plansResult.status === "fulfilled") setPlans(plansResult.value);
+      if (activeResult.status === "fulfilled") setActive(activeResult.value);
+      if (libraryResult.status === "fulfilled") setLibrary(libraryResult.value);
+      setMethods(methodsResult.status === "fulfilled" && methodsResult.value.length ? methodsResult.value : [normalTrainingMethod()]);
+
+      const requiredFailure = [plansResult, libraryResult].find((result) => result.status === "rejected");
+      if (requiredFailure?.status === "rejected") {
+        setLoadError(dataErrorMessage(requiredFailure.reason, "Não foi possível carregar seus treinos ou a biblioteca de exercícios."));
+      }
     } catch (error) {
       setLoadError(dataErrorMessage(error, "Verifique sua conexão e tente novamente."));
     } finally {
