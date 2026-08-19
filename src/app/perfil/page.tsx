@@ -40,13 +40,15 @@ function Profile() {
     setMessage("");
     setError("");
     try {
+      const normalizedName = name.trim();
+      if (!normalizedName) throw new Error("Informe seu nome.");
       const parsedHeight = height === "" ? undefined : Number(height);
       if (parsedHeight !== undefined && (!Number.isFinite(parsedHeight) || parsedHeight <= 0 || parsedHeight > 300)) throw new Error("Informe uma altura válida.");
       const photoURL = photo ? await uploadProfilePhoto(user!.uid, photo) : profile?.photoURL;
       await updateProfile(user!.uid, {
-        name: name.trim(),
+        name: normalizedName,
         height: parsedHeight,
-        goal: goal.trim(),
+        goal: goal.trim() || undefined,
         birthDate: birthDate || undefined,
         sex: sex || undefined,
         photoURL,

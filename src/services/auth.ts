@@ -9,7 +9,7 @@ import {
   updateProfile as updateAuthProfile,
   type User,
 } from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { deleteField, doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { auth, db, storage } from "@/lib/firebase";
 import type { SystemConfig, UserProfile } from "@/types";
@@ -50,6 +50,7 @@ export function friendlyAuthError(error: unknown) {
     "auth/network-request-failed": "Sem conexão com a internet. Verifique sua rede e tente novamente.",
     "permission-denied": "Sua conta não possui permissão para concluir esta operação.",
     "firestore/permission-denied": "Sua conta não possui permissão para concluir esta operação.",
+    "storage/unauthorized": "Sua conta não possui permissão para enviar esta foto.",
   };
   return messages[code] ?? (error instanceof Error ? error.message : "Não foi possível concluir a operação agora.");
 }
@@ -66,12 +67,16 @@ export async function profile(uid: string) {
 type EditableProfile = Pick<UserProfile, "name" | "height" | "goal" | "birthDate" | "sex" | "photoURL">;
 
 export async function updateProfile(uid: string, data: Partial<EditableProfile>) {
-  const payload = { ...data, updatedAt: serverTimestamp() };
-  await setDoc(doc(db, "users", uid), payload, { merge: true });
+  const payload: Record<string, unknown> = { updatedAt: serverTimestamp() };
+  if (data.name !== undefined) payload.name = data.name;
+  for (const key of ["height", "goal", "birthDate", "sex", "photoURL"] as const) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) payload[key] = data[key] ?? deleteField();
+  }
+  await updateDoc(doc(db, "users", uid), payload);
   if (auth.currentUser?.uid === uid) {
     await updateAuthProfile(auth.currentUser, {
       ...(data.name !== undefined ? { displayName: data.name } : {}),
-      ...(data.photoURL !== undefined ? { photoURL: data.photoURL } : {}),
+      ...(Object.prototype.hasOwnProperty.call(data, "photoURL") ? { photoURL: data.photoURL ?? null } : {}),
     });
   }
 }
