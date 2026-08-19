@@ -37,6 +37,7 @@ function Work() {
   const [methods, setMethods] = useState<TrainingMethod[]>([]);
   const [builder, setBuilder] = useState<Workout | null | undefined>(undefined);
   const [draft, setDraft] = useState<WorkoutExercise[]>([]);
+  const [collapsedDraftIds, setCollapsedDraftIds] = useState<Set<string>>(() => new Set());
   const [draftGroups, setDraftGroups] = useState<WorkoutExerciseGroup[]>([]);
   const [methodTargetId, setMethodTargetId] = useState<string | null>(null);
   const [groupMethodId, setGroupMethodId] = useState("");
@@ -109,6 +110,7 @@ function Work() {
   function openBuilder(workout?: Workout) {
     setBuilder(workout ?? null);
     setDraft(workout ? reorder(workout.exercises) : []);
+    setCollapsedDraftIds(new Set());
     setDraftGroups(workout?.exerciseGroups ?? []);
     setName(workout?.name ?? "");
     setTitle(workout?.title ?? "");
@@ -123,6 +125,24 @@ function Work() {
 
   function updateDraft(id: string, data: Partial<WorkoutExercise>) {
     setDraft((items) => items.map((item) => item.id === id ? { ...item, ...data } : item));
+  }
+
+  function setDraftCollapsed(id: string, collapsed: boolean) {
+    setCollapsedDraftIds((ids) => {
+      const next = new Set(ids);
+      if (collapsed) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function finishDraftExercise(item: WorkoutExercise) {
+    if (!Number.isInteger(item.sets) || item.sets < 1 || !Number.isInteger(item.repsMin) || item.repsMin < 1 || !Number.isInteger(item.repsMax) || item.repsMax < item.repsMin || !Number.isFinite(item.restSeconds) || item.restSeconds < 0) {
+      setMessage(`Revise séries, repetições e descanso de ${item.name}.`);
+      return;
+    }
+    setMessage("");
+    setDraftCollapsed(item.id, true);
   }
 
   function addExercise(exercise: Exercise) {
@@ -178,6 +198,11 @@ function Work() {
 
   function removeDraftExercise(id: string) {
     setDraft((items) => reorder(items.filter((candidate) => candidate.id !== id)));
+    setCollapsedDraftIds((ids) => {
+      const next = new Set(ids);
+      next.delete(id);
+      return next;
+    });
     setDraftGroups((items) => items.map((groupItem) => ({ ...groupItem, exerciseIds: groupItem.exerciseIds.filter((exerciseId) => exerciseId !== id) })).filter((groupItem) => groupItem.exerciseIds.length));
     setGroupMembers((items) => items.filter((exerciseId) => exerciseId !== id));
   }
@@ -351,7 +376,37 @@ function Work() {
       {!library.length ? <div className="empty"><strong>Biblioteca ainda não foi importada.</strong><span>Peça ao administrador para importar a biblioteca no painel administrativo.</span>{admin && <Button onClick={() => void importLibrary()} disabled={importing}>{importing ? "IMPORTANDO..." : "IMPORTAR 202 EXERCÍCIOS"}</Button>}</div> : <form className="workout-builder" onSubmit={saveWorkout}>
         <div className="form-grid workout-info"><label>Nome do treino<input required value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Treino A"/></label><label>Título<input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ex.: Peito e tríceps"/></label><label className="workout-description">Descrição<textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Opcional"/></label></div>
         <section className="builder-section"><div className="builder-section-title"><div><span>1</span><div><h3>Adicionar exercício</h3><p>Pesquise e adicione cada exercício.</p></div></div></div><div className="library-filters"><label><span className="sr-only">Pesquisar exercícios</span><span className="search-input"><Search size={17}/><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nome, inglês ou alias"/></span></label><label>Grupo<select value={group} onChange={(event) => setGroup(event.target.value)}><option value="">Todos os grupos</option>{exerciseMuscleGroups.map((item) => <option key={item}>{item}</option>)}</select></label></div><div className="exercise-picker">{filteredLibrary.map((item) => { const added = draft.some((candidate) => candidate.exerciseId === item.id); return <article key={item.id} className={`library-item ${added ? "selected" : ""}`}><div><strong>{item.name}</strong><small>{item.muscleGroup}</small></div><div>{item.videoUrl && <a className="video-link" href={item.videoUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={15}/> Vídeo</a>}<button type="button" className={`exercise-add-button ${added ? "added" : ""}`} onClick={() => addExercise(item)} disabled={added}>{added ? <><Check size={16}/> ADICIONADO</> : <><Plus size={16}/> ADICIONAR EXERCÍCIO</>}</button></div></article>; })}</div>{!filteredLibrary.length && <Empty title="Nenhum exercício encontrado" detail="Tente outro nome ou remova os filtros."/>}</section>
-        <section className="builder-section"><div className="builder-section-title"><div><span>2</span><div><h3>Exercícios adicionados <b>{draft.length}</b></h3><p>Escolha um método e ajuste somente os parâmetros compatíveis.</p></div></div></div>{!draft.length && <Empty title="Nenhum exercício adicionado" detail="Use Adicionar exercício na biblioteca acima."/>}{draft.map((item, index) => { const method = item.methodSnapshot ?? snapshotMethod(normalTrainingMethod()); const catalogMethod = methods.find((candidate) => candidate.id === method.id); return <div className="card workout-draft-item" key={item.id}><div className="row"><strong>{index + 1}. {item.name}</strong><span><button type="button" className="draft-order-button" onClick={() => moveExercise(index, -1)} disabled={index === 0} aria-label={`Mover ${item.name} para cima`}>↑</button><button type="button" className="draft-order-button" onClick={() => moveExercise(index, 1)} disabled={index === draft.length - 1} aria-label={`Mover ${item.name} para baixo`}>↓</button><button type="button" className="draft-remove-button" onClick={() => removeDraftExercise(item.id)}>Remover</button></span></div><div className="method-summary"><div><small>Método</small><strong>{method.name}</strong>{catalogMethod?.active === false && <span className="method-disabled">Desativado para novos treinos; snapshot preservado.</span>}</div><button type="button" className="method-change-button" disabled={Boolean(item.groupId)} onClick={() => setMethodTargetId(item.id)}>{item.groupId ? "Definido pelo grupo" : "ALTERAR MÉTODO"}</button></div><div className="form-grid">{method.capabilities.sets && <label>Séries<input type="number" min="1" step="1" value={item.sets} onChange={(event) => updateDraft(item.id, { sets: Number(event.target.value) })}/></label>}{method.capabilities.rest && <label>Descanso (s)<input type="number" min="0" step="1" value={item.restSeconds} onChange={(event) => updateDraft(item.id, { restSeconds: Number(event.target.value) })}/></label>}{method.capabilities.reps && <><label>Repetições mín.<input type="number" min="1" step="1" value={item.repsMin} onChange={(event) => updateDraft(item.id, { repsMin: Number(event.target.value) })}/></label><label>Repetições máx.<input type="number" min="1" step="1" value={item.repsMax} onChange={(event) => updateDraft(item.id, { repsMax: Number(event.target.value) })}/></label></>}{method.capabilities.load && <label>Carga sugerida (kg)<input type="number" min="0" step="0.1" value={item.suggestedLoad ?? ""} onChange={(event) => updateDraft(item.id, { suggestedLoad: event.target.value === "" ? undefined : Number(event.target.value) })}/></label>}<label>Observação<textarea value={item.notes ?? ""} onChange={(event) => updateDraft(item.id, { notes: event.target.value || undefined })}/></label></div>{item.methodConfig && <MethodConfigEditor method={method} config={item.methodConfig} onChange={(methodConfig) => updateDraft(item.id, { methodConfig })}/>}</div>})}</section>
+        <section className="builder-section">
+          <div className="builder-section-title"><div><span>2</span><div><h3>Exercícios adicionados <b>{draft.length}</b></h3><p>Escolha um método, ajuste os parâmetros e finalize cada exercício para recolhê-lo.</p></div></div></div>
+          {!draft.length && <Empty title="Nenhum exercício adicionado" detail="Use Adicionar exercício na biblioteca acima."/>}
+          <div className="workout-draft-list">
+            {draft.map((item, index) => {
+              const method = item.methodSnapshot ?? snapshotMethod(normalTrainingMethod());
+              const catalogMethod = methods.find((candidate) => candidate.id === method.id);
+              const collapsed = collapsedDraftIds.has(item.id);
+              return <div className={`card workout-draft-item ${collapsed ? "is-collapsed" : ""}`} key={item.id}>
+                <div className="row workout-draft-header">
+                  <div className="workout-draft-name"><span>{index + 1}</span><div><strong>{item.name}</strong>{collapsed && <small><Check size={13}/> Finalizado</small>}</div></div>
+                  <span className="workout-draft-controls"><button type="button" className="draft-order-button" onClick={() => moveExercise(index, -1)} disabled={index === 0} aria-label={`Mover ${item.name} para cima`}>↑</button><button type="button" className="draft-order-button" onClick={() => moveExercise(index, 1)} disabled={index === draft.length - 1} aria-label={`Mover ${item.name} para baixo`}>↓</button><button type="button" className="draft-remove-button" onClick={() => removeDraftExercise(item.id)}>Remover</button></span>
+                </div>
+                {collapsed ? <div className="draft-collapsed-summary">
+                  <div className="draft-summary-chips">
+                    <span className="draft-method-chip">{method.name}</span>
+                    {method.capabilities.sets && <span><b>{item.sets}</b> séries</span>}
+                    {method.capabilities.reps && <span><b>{item.repsMin}–{item.repsMax}</b> repetições</span>}
+                    {method.capabilities.rest && <span><b>{item.restSeconds}s</b> descanso</span>}
+                    {method.capabilities.load && item.suggestedLoad !== undefined && <span><b>{item.suggestedLoad} kg</b> carga</span>}
+                  </div>
+                  <button type="button" className="draft-edit-button" onClick={() => setDraftCollapsed(item.id, false)} aria-expanded="false"><Pencil size={15}/> EDITAR</button>
+                </div> : <>
+                  <div className="method-summary"><div><small>Método</small><strong>{method.name}</strong>{catalogMethod?.active === false && <span className="method-disabled">Desativado para novos treinos; snapshot preservado.</span>}</div><button type="button" className="method-change-button" disabled={Boolean(item.groupId)} onClick={() => setMethodTargetId(item.id)}>{item.groupId ? "Definido pelo grupo" : "ALTERAR MÉTODO"}</button></div>
+                  <div className="form-grid">{method.capabilities.sets && <label>Séries<input type="number" min="1" step="1" value={item.sets} onChange={(event) => updateDraft(item.id, { sets: Number(event.target.value) })}/></label>}{method.capabilities.rest && <label>Descanso (s)<input type="number" min="0" step="1" value={item.restSeconds} onChange={(event) => updateDraft(item.id, { restSeconds: Number(event.target.value) })}/></label>}{method.capabilities.reps && <><label>Repetições mín.<input type="number" min="1" step="1" value={item.repsMin} onChange={(event) => updateDraft(item.id, { repsMin: Number(event.target.value) })}/></label><label>Repetições máx.<input type="number" min="1" step="1" value={item.repsMax} onChange={(event) => updateDraft(item.id, { repsMax: Number(event.target.value) })}/></label></>}{method.capabilities.load && <label>Carga sugerida (kg)<input type="number" min="0" step="0.1" value={item.suggestedLoad ?? ""} onChange={(event) => updateDraft(item.id, { suggestedLoad: event.target.value === "" ? undefined : Number(event.target.value) })}/></label>}<label>Observação<textarea value={item.notes ?? ""} onChange={(event) => updateDraft(item.id, { notes: event.target.value || undefined })}/></label></div>
+                  {item.methodConfig && <MethodConfigEditor method={method} config={item.methodConfig} onChange={(methodConfig) => updateDraft(item.id, { methodConfig })}/>}<div className="draft-finish-row"><button type="button" className="draft-finish-button" onClick={() => finishDraftExercise(item)}><Check size={17}/> FINALIZAR EXERCÍCIO</button></div>
+                </>}
+              </div>;
+            })}
+          </div>
+        </section>
         <section className="builder-section group-builder"><div className="builder-section-title"><div><span>3</span><div><h3>Combinar exercícios</h3><p>Crie bi-sets, tri-sets, supersets e sequências maiores.</p></div></div></div>{draftGroups.map((item) => <div className="group-card" key={item.id}><div><strong>{item.name}</strong><small>{item.exerciseIds.map((id) => draft.find((exercise) => exercise.id === id)?.name).filter(Boolean).join(" → ")}</small></div><button type="button" className="text-button danger-text" onClick={() => removeExerciseGroup(item.id)}>Remover grupo</button></div>)}<div className="group-create"><label>Método combinado<select value={groupMethodId} onChange={(event) => { setGroupMethodId(event.target.value); setGroupMembers([]); }}><option value="">Selecione</option>{methods.filter((item) => item.active && item.engine === "group").map((item) => <option value={item.id} key={item.id}>{item.name} ({item.exerciseRules.minExercises}–{item.exerciseRules.maxExercises})</option>)}</select></label><fieldset><legend>Exercícios do grupo, na ordem</legend>{draft.filter((item) => !item.groupId).map((item) => <label className="method-check" key={item.id}><input type="checkbox" checked={groupMembers.includes(item.id)} onChange={(event) => setGroupMembers((items) => event.target.checked ? [...items, item.id] : items.filter((id) => id !== item.id))}/>{item.name}</label>)}</fieldset><Button type="button" className="outline" onClick={addExerciseGroup} disabled={!groupMethodId}>CRIAR GRUPO</Button></div></section>
         <div className="workout-form-actions"><Button type="submit" className="workout-submit" disabled={saving}>{saving ? "SALVANDO..." : builder ? "SALVAR ALTERAÇÕES" : `CRIAR TREINO (${draft.length})`}</Button><button type="button" className="text-button" onClick={() => setBuilder(undefined)} disabled={saving}>Cancelar</button></div>
       </form>}
