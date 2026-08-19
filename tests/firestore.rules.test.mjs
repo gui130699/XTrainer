@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, Timestamp, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, runTransaction, setDoc, Timestamp, updateDoc } from "firebase/firestore";
 
 let environment;
 let anonymous;
@@ -79,7 +79,13 @@ test("ownerId é obrigatório e imutável", async () => {
 });
 
 test("sessão ativa usa um único ID determinístico e histórico não reabre", async () => {
-  await assertSucceeds(setDoc(doc(userA, "workoutSessions", "active-user-a"), session("user-a")));
+  const activeReference = doc(userA, "workoutSessions", "active-user-a");
+  await assertSucceeds(runTransaction(userA, async (transaction) => {
+    const existing = await transaction.get(activeReference);
+    if (existing.exists()) throw new Error("A sessão ativa deveria começar vazia.");
+    transaction.set(activeReference, session("user-a"));
+  }));
+  await assertFails(getDoc(doc(userB, "workoutSessions", "active-user-a")));
   await assertFails(setDoc(doc(userA, "workoutSessions", "random-active"), session("user-a")));
   await assertSucceeds(setDoc(doc(userA, "workoutSessions", "completed-a"), session("user-a", "completed")));
   await assertFails(updateDoc(doc(userA, "workoutSessions", "completed-a"), { status: "active" }));
