@@ -1,7 +1,11 @@
 "use client";
 
-import { Download, Share2, X } from "lucide-react";
+import Image from "next/image";
+import { Share2, X } from "lucide-react";
 import { useEffect, useState } from "react";
+
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+const buildVersion = process.env.NEXT_PUBLIC_BUILD_VERSION ?? "local";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -61,6 +65,6 @@ export function InstallAppButton() {
       <strong>Instalar o XTrainer</strong>
       <p><Share2 size={16}/> No Safari, toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>.</p>
     </div>}
-    <button className="install-app-button" onClick={() => void install()}><Download size={18}/> INSTALAR APP</button>
+    <button className="install-app-button" onClick={() => void install()} aria-label="Instalar XTrainer"><Image src={`${basePath}/xtrainer-user-icon-192.png?v=${buildVersion}`} alt="" aria-hidden="true" width={26} height={26} unoptimized/><span>INSTALAR APP</span></button>
   </div>;
 }

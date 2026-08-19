@@ -48,6 +48,12 @@ const withoutUndefinedDeep = <T>(data: T): T => {
   if (data && typeof data === "object" && Object.getPrototypeOf(data) === Object.prototype) return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined).map(([key, value]) => [key, withoutUndefinedDeep(value)])) as T;
   return data;
 };
+const missingIndex = (reason: unknown) => {
+  if (!reason || typeof reason !== "object" || !("code" in reason)) return false;
+  return String((reason as { code?: unknown }).code).endsWith("failed-precondition");
+};
+const sessionStartedAt = (item: WorkoutSession) => item.startedAt?.toMillis() ?? 0;
+const listOwnerDocuments = (collectionName: string, uid: string) => getDocs(query(collection(db, collectionName), where("ownerId", "==", uid)));
 function validateDefaultExercises() {
   if (DEFAULT_EXERCISES.length !== 202) throw Error("O dataset padrão deve possuir exatamente 202 exercícios.");
   const ids = new Set<string>();
@@ -165,7 +171,14 @@ const weightPayload = (data: BodyWeightInput) => withoutUndefined({
 });
 
 export const weights = {
-  list: async (uid: string) => (await getDocs(query(collection(db, "bodyWeights"), where("ownerId", "==", uid), orderBy("date", "asc")))).docs.map((item) => normalizeBodyWeightDocument(item.id, item.data())),
+  list: async (uid: string) => {
+    try {
+      return (await getDocs(query(collection(db, "bodyWeights"), where("ownerId", "==", uid), orderBy("date", "asc")))).docs.map((item) => normalizeBodyWeightDocument(item.id, item.data()));
+    } catch (reason) {
+      if (!missingIndex(reason)) throw reason;
+      return (await listOwnerDocuments("bodyWeights", uid)).docs.map((item) => normalizeBodyWeightDocument(item.id, item.data())).sort((a, b) => a.date.localeCompare(b.date));
+    }
+  },
   save: (data: BodyWeightInput) => addDoc(collection(db, "bodyWeights"), { ...weightPayload(data), createdAt: serverTimestamp() }),
   update: (id: string, data: Pick<BodyWeight, "date" | "weight" | "note">) => updateDoc(doc(db, "bodyWeights", id), { ...withoutUndefined(data), updatedAt: serverTimestamp() }),
   remove: (id: string) => deleteDoc(doc(db, "bodyWeights", id)),
@@ -189,7 +202,14 @@ const assessmentPayload = (data: AssessmentInput) => withoutUndefined({
 });
 
 export const assessments = {
-  list: async (uid: string) => (await getDocs(query(collection(db, "physicalAssessments"), where("ownerId", "==", uid), orderBy("date", "desc")))).docs.map((item) => normalizeAssessmentDocument(item.id, item.data())),
+  list: async (uid: string) => {
+    try {
+      return (await getDocs(query(collection(db, "physicalAssessments"), where("ownerId", "==", uid), orderBy("date", "desc")))).docs.map((item) => normalizeAssessmentDocument(item.id, item.data()));
+    } catch (reason) {
+      if (!missingIndex(reason)) throw reason;
+      return (await listOwnerDocuments("physicalAssessments", uid)).docs.map((item) => normalizeAssessmentDocument(item.id, item.data())).sort((a, b) => b.date.localeCompare(a.date));
+    }
+  },
   save: async (data: AssessmentInput, id?: string) => {
     const payload = assessmentPayload(data);
     if (id) {
@@ -276,24 +296,57 @@ async function migrateLegacyActive(uid: string, legacy: QueryDocumentSnapshot<Do
 }
 
 export const sessions = {
-  list: async (uid: string) => (await getDocs(query(collection(db, "workoutSessions"), where("ownerId", "==", uid), orderBy("startedAt", "desc"), limit(30)))).docs.map((item) => normalizeWorkoutSessionDocument(item.id, item.data())),
-  listCompletedPage: async (uid: string, pageSize = 20, cursor?: QueryDocumentSnapshot<DocumentData> | null): Promise<SessionPage> => {
-    const constraints: QueryConstraint[] = [where("ownerId", "==", uid), where("status", "==", "completed"), orderBy("startedAt", "desc"), limit(pageSize)];
-    if (cursor) constraints.splice(constraints.length - 1, 0, startAfter(cursor));
-    const snapshot = await getDocs(query(collection(db, "workoutSessions"), ...constraints));
-    return {
-      items: snapshot.docs.map((item) => normalizeWorkoutSessionDocument(item.id, item.data())),
-      cursor: snapshot.docs.at(-1) ?? null,
-      hasMore: snapshot.docs.length === pageSize,
-    };
+  list: async (uid: string) => {
+    try {
+      return (await getDocs(query(collection(db, "workoutSessions"), where("ownerId", "==", uid), orderBy("startedAt", "desc"), limit(30)))).docs.map((item) => normalizeWorkoutSessionDocument(item.id, item.data()));
+    } catch (reason) {
+      if (!missingIndex(reason)) throw reason;
+      return (await listOwnerDocuments("workoutSessions", uid)).docs.map((item) => normalizeWorkoutSessionDocument(item.id, item.data())).sort((a, b) => sessionStartedAt(b) - sessionStartedAt(a)).slice(0, 30);
+    }
   },
-  listCompletedBetween: async (uid: string, start: Date, end: Date) => (await getDocs(query(collection(db, "workoutSessions"),
-    where("ownerId", "==", uid),
-    where("status", "==", "completed"),
-    where("startedAt", ">=", Timestamp.fromDate(start)),
-    where("startedAt", "<", Timestamp.fromDate(end)),
-    orderBy("startedAt", "desc"),
-  ))).docs.map((item) => normalizeWorkoutSessionDocument(item.id, item.data())),
+  listCompletedPage: async (uid: string, pageSize = 20, cursor?: QueryDocumentSnapshot<DocumentData> | null): Promise<SessionPage> => {
+    try {
+      const constraints: QueryConstraint[] = [where("ownerId", "==", uid), where("status", "==", "completed"), orderBy("startedAt", "desc"), limit(pageSize)];
+      if (cursor) constraints.splice(constraints.length - 1, 0, startAfter(cursor));
+      const snapshot = await getDocs(query(collection(db, "workoutSessions"), ...constraints));
+      return {
+        items: snapshot.docs.map((item) => normalizeWorkoutSessionDocument(item.id, item.data())),
+        cursor: snapshot.docs.at(-1) ?? null,
+        hasMore: snapshot.docs.length === pageSize,
+      };
+    } catch (reason) {
+      if (!missingIndex(reason)) throw reason;
+      const documents = (await listOwnerDocuments("workoutSessions", uid)).docs
+        .filter((item) => item.data().status === "completed")
+        .sort((a, b) => sessionStartedAt(normalizeWorkoutSessionDocument(b.id, b.data())) - sessionStartedAt(normalizeWorkoutSessionDocument(a.id, a.data())));
+      const start = cursor ? Math.max(0, documents.findIndex((item) => item.id === cursor.id) + 1) : 0;
+      const page = documents.slice(start, start + pageSize);
+      return {
+        items: page.map((item) => normalizeWorkoutSessionDocument(item.id, item.data())),
+        cursor: page.at(-1) ?? null,
+        hasMore: start + page.length < documents.length,
+      };
+    }
+  },
+  listCompletedBetween: async (uid: string, start: Date, end: Date) => {
+    try {
+      return (await getDocs(query(collection(db, "workoutSessions"),
+        where("ownerId", "==", uid),
+        where("status", "==", "completed"),
+        where("startedAt", ">=", Timestamp.fromDate(start)),
+        where("startedAt", "<", Timestamp.fromDate(end)),
+        orderBy("startedAt", "desc"),
+      ))).docs.map((item) => normalizeWorkoutSessionDocument(item.id, item.data()));
+    } catch (reason) {
+      if (!missingIndex(reason)) throw reason;
+      const startMillis = start.getTime();
+      const endMillis = end.getTime();
+      return (await listOwnerDocuments("workoutSessions", uid)).docs
+        .map((item) => normalizeWorkoutSessionDocument(item.id, item.data()))
+        .filter((item) => item.status === "completed" && sessionStartedAt(item) >= startMillis && sessionStartedAt(item) < endMillis)
+        .sort((a, b) => sessionStartedAt(b) - sessionStartedAt(a));
+    }
+  },
   listAllCompleted: async (uid: string, pageSize = 100) => {
     const items: WorkoutSession[] = [];
     let cursor: QueryDocumentSnapshot<DocumentData> | null = null;
@@ -311,8 +364,15 @@ export const sessions = {
   getActive: async (uid: string) => {
     const fixed = await getDoc(doc(db, "workoutSessions", activeSessionId(uid)));
     if (fixed.exists() && fixed.data().status === "active") return normalizeWorkoutSessionDocument(fixed.id, fixed.data());
-    const legacy = await getDocs(query(collection(db, "workoutSessions"), where("ownerId", "==", uid), where("status", "==", "active"), limit(10)));
-    return legacy.empty ? null : migrateLegacyActive(uid, legacy.docs);
+    let legacyDocuments: QueryDocumentSnapshot<DocumentData>[];
+    try {
+      legacyDocuments = (await getDocs(query(collection(db, "workoutSessions"), where("ownerId", "==", uid), where("status", "==", "active"), limit(10)))).docs;
+    } catch (reason) {
+      if (!missingIndex(reason)) throw reason;
+      const owned = await listOwnerDocuments("workoutSessions", uid);
+      legacyDocuments = owned.docs.filter((item) => item.data().status === "active").slice(0, 10);
+    }
+    return legacyDocuments.length ? migrateLegacyActive(uid, legacyDocuments) : null;
   },
   start: async (uid: string, workout: Workout) => {
     const id = activeSessionId(uid);
