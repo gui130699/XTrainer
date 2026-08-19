@@ -14,7 +14,7 @@ import { dataErrorMessage, exerciseMuscleGroups, normalizeSearchText } from "@/l
 import { exercises, sessions, workouts } from "@/services/data";
 import { trainingMethodsService } from "@/services/training-methods";
 import type { Exercise, SyncStatus, TrainingMethod, TrainingSet, Workout, WorkoutExercise, WorkoutExerciseGroup, WorkoutSession } from "@/types";
-import { Archive, Check, Copy, ExternalLink, Pencil, Play, Plus, Search, Timer } from "lucide-react";
+import { Archive, Check, ChevronDown, Copy, ExternalLink, Pencil, Play, Plus, Search, Timer } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -38,6 +38,7 @@ function Work() {
   const [builder, setBuilder] = useState<Workout | null | undefined>(undefined);
   const [draft, setDraft] = useState<WorkoutExercise[]>([]);
   const [collapsedDraftIds, setCollapsedDraftIds] = useState<Set<string>>(() => new Set());
+  const [expandedPlanIds, setExpandedPlanIds] = useState<Set<string>>(() => new Set());
   const [draftGroups, setDraftGroups] = useState<WorkoutExerciseGroup[]>([]);
   const [methodTargetId, setMethodTargetId] = useState<string | null>(null);
   const [groupMethodId, setGroupMethodId] = useState("");
@@ -132,6 +133,15 @@ function Work() {
       const next = new Set(ids);
       if (collapsed) next.add(id);
       else next.delete(id);
+      return next;
+    });
+  }
+
+  function togglePlanExercises(id: string) {
+    setExpandedPlanIds((ids) => {
+      const next = new Set(ids);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -411,7 +421,21 @@ function Work() {
         <div className="workout-form-actions"><Button type="submit" className="workout-submit" disabled={saving}>{saving ? "SALVANDO..." : builder ? "SALVAR ALTERAÇÕES" : `CRIAR TREINO (${draft.length})`}</Button><button type="button" className="text-button" onClick={() => setBuilder(undefined)} disabled={saving}>Cancelar</button></div>
       </form>}
     </Card>}
-    {!loading && <><h2>Treinos ativos</h2><div className="cards">{activePlans.map((workout) => <Card className="workout-plan-card" key={workout.id}><div className="workout-plan-header"><div><span className="workout-plan-label">TREINO ATIVO</span><h2>{workout.title}</h2></div><span className="workout-plan-count">{workout.exercises.length} {workout.exercises.length === 1 ? "exercício" : "exercícios"}</span></div>{workout.description && <p className="workout-plan-description">{workout.description}</p>}<div className="plan-actions workout-plan-actions"><Button className="workout-start-button" onClick={() => void start(workout)} disabled={Boolean(active)}><Play size={17} fill="currentColor"/> INICIAR</Button><div className="workout-secondary-actions"><button className="workout-action-button" onClick={() => openBuilder(workout)}><Pencil size={16}/> Editar</button><button className="workout-action-button" onClick={async () => { try { await workouts.duplicate(workout); await reloadPlans(); } catch { setMessage("Não foi possível duplicar o treino."); } }}><Copy size={16}/> Duplicar</button><button className="workout-action-button" onClick={async () => { try { await workouts.save(workoutInput(workout, false), workout.id); await reloadPlans(); } catch { setMessage("Não foi possível arquivar o treino."); } }}><Archive size={16}/> Arquivar</button></div></div></Card>)}</div>{!activePlans.length && builder === undefined && <Empty title="Nenhum treino ativo" detail="Use Novo treino para montar o seu."/>}
+    {!loading && <><h2>Treinos ativos</h2><div className="cards">{activePlans.map((workout) => {
+      const expanded = expandedPlanIds.has(workout.id);
+      const exerciseListId = `workout-exercises-${workout.id}`;
+      return <Card className={`workout-plan-card ${expanded ? "is-expanded" : ""}`} key={workout.id}>
+        <button type="button" className="workout-plan-toggle" onClick={() => togglePlanExercises(workout.id)} aria-expanded={expanded} aria-controls={exerciseListId}>
+          <div className="workout-plan-header"><div><span className="workout-plan-label">TREINO ATIVO</span><h2>{workout.title}</h2></div><div className="workout-plan-count-group"><span className="workout-plan-count">{workout.exercises.length} {workout.exercises.length === 1 ? "exercício" : "exercícios"}</span><span className="workout-plan-chevron" aria-hidden="true"><ChevronDown size={20}/></span></div></div>
+          {workout.description && <p className="workout-plan-description">{workout.description}</p>}
+        </button>
+        {expanded && <section className="workout-exercise-list" id={exerciseListId} aria-label={`Exercícios de ${workout.title}`}>
+          <div className="workout-exercise-list-title"><span>EXERCÍCIOS DO TREINO</span><small>Clique no cabeçalho para recolher</small></div>
+          <ol>{workout.exercises.map((exercise, index) => <li key={exercise.id}><span className="workout-exercise-number">{index + 1}</span><div className="workout-exercise-detail"><strong>{exercise.name}</strong><div className="workout-exercise-meta"><span>{exercise.methodSnapshot?.name ?? "Séries normais"}</span><span>{exercise.sets} {exercise.sets === 1 ? "série" : "séries"}</span><span>{exercise.repsMin}–{exercise.repsMax} repetições</span><span>{exercise.restSeconds}s de descanso</span>{exercise.suggestedLoad !== undefined && <span>{exercise.suggestedLoad} kg</span>}</div>{exercise.notes && <small>{exercise.notes}</small>}</div></li>)}</ol>
+        </section>}
+        <div className="plan-actions workout-plan-actions"><Button className="workout-start-button" onClick={() => void start(workout)} disabled={Boolean(active)}><Play size={17} fill="currentColor"/> INICIAR</Button><div className="workout-secondary-actions"><button className="workout-action-button" onClick={() => openBuilder(workout)}><Pencil size={16}/> Editar</button><button className="workout-action-button" onClick={async () => { try { await workouts.duplicate(workout); await reloadPlans(); } catch { setMessage("Não foi possível duplicar o treino."); } }}><Copy size={16}/> Duplicar</button><button className="workout-action-button" onClick={async () => { try { await workouts.save(workoutInput(workout, false), workout.id); await reloadPlans(); } catch { setMessage("Não foi possível arquivar o treino."); } }}><Archive size={16}/> Arquivar</button></div></div>
+      </Card>;
+    })}</div>{!activePlans.length && builder === undefined && <Empty title="Nenhum treino ativo" detail="Use Novo treino para montar o seu."/>}
       {archivedPlans.length > 0 && <section className="archived-section"><h2>Treinos arquivados</h2><div className="cards">{archivedPlans.map((workout) => <Card key={workout.id}><h2>{workout.title}</h2><p>{workout.description}</p><small>{workout.exercises.length} exercícios</small><div className="plan-actions"><Button className="outline" onClick={async () => { try { await workouts.save(workoutInput(workout, true), workout.id); await reloadPlans(); } catch { setMessage("Não foi possível restaurar o treino."); } }}>RESTAURAR</Button><button className="text-button danger-text" onClick={async () => { if (!confirm(`Excluir definitivamente ${workout.name}? As sessões históricas serão preservadas.`)) return; try { await workouts.remove(workout.id); await reloadPlans(); } catch { setMessage("Não foi possível excluir o treino."); } }}>Excluir definitivamente</button></div></Card>)}</div></section>}</>}
   </AppShell>;
 }

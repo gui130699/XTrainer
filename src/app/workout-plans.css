@@ -26,6 +26,26 @@
   gap: 18px;
 }
 
+.workout-plan-toggle {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.workout-plan-toggle:hover h2 {
+  color: #a5f3fc;
+}
+
+.workout-plan-toggle:focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 7px;
+}
+
 .workout-plan-label {
   display: block;
   margin-bottom: 8px;
@@ -56,9 +76,148 @@
   white-space: nowrap;
 }
 
+.workout-plan-count-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workout-plan-chevron {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid #2c5773;
+  border-radius: 10px;
+  background: #0b35584d;
+  color: #67e8f9;
+  transition: transform 180ms ease, background 180ms ease;
+}
+
+.workout-plan-toggle:hover .workout-plan-chevron {
+  background: #0e749066;
+}
+
+.workout-plan-card.is-expanded .workout-plan-chevron {
+  transform: rotate(180deg);
+}
+
 .workout-plan-description {
   margin: -6px 0 0;
   color: #a8bacb;
+}
+
+.workout-plan-toggle .workout-plan-description {
+  margin-top: 10px;
+}
+
+.workout-exercise-list {
+  padding: 15px;
+  border: 1px solid #29455e;
+  border-radius: 15px;
+  background: #07111f99;
+  animation: workout-list-in 170ms ease-out;
+}
+
+@keyframes workout-list-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.workout-exercise-list-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px 11px;
+}
+
+.workout-exercise-list-title > span {
+  color: #22d3ee;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1.2px;
+}
+
+.workout-exercise-list-title small {
+  color: #71869b;
+  font-size: 10px;
+}
+
+.workout-exercise-list ol {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workout-exercise-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 2px;
+  border-top: 1px solid #203448;
+}
+
+.workout-exercise-number {
+  width: 27px;
+  height: 27px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border: 1px solid #21628a;
+  border-radius: 8px;
+  background: #0b355866;
+  color: #a5f3fc;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.workout-exercise-detail {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.workout-exercise-detail > strong {
+  color: #f4f8fb;
+  font-size: 14px;
+}
+
+.workout-exercise-detail > small {
+  color: #9fb1c4;
+  line-height: 1.4;
+}
+
+.workout-exercise-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.workout-exercise-meta span {
+  padding: 4px 7px;
+  border: 1px solid #29455e;
+  border-radius: 999px;
+  background: #0f1e2d;
+  color: #9fb1c4;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.workout-exercise-meta span:first-child {
+  border-color: #0e7490;
+  background: #08334480;
+  color: #a5f3fc;
+  font-weight: 800;
 }
 
 .workout-plan-actions {
@@ -113,6 +272,15 @@
 
   .workout-plan-count {
     justify-self: start;
+  }
+
+  .workout-plan-count-group {
+    justify-self: start;
+  }
+
+  .workout-exercise-list-title {
+    align-items: flex-start;
+    display: grid;
   }
 
   .workout-plan-actions {
