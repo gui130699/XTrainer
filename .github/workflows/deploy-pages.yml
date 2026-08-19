@@ -1,4 +1,4 @@
-name: Deploy XTrainer to GitHub Pages
+name: Validate and deploy XTrainer
 
 on:
   push:
@@ -21,15 +21,39 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
+      - name: Checkout XTrainer
         uses: actions/checkout@v4
+      - name: Stamp PWA build version
+        run: sed -i "s/__BUILD_VERSION__/${GITHUB_SHA}/g" public/sw.js
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+      - name: Setup Java for Firebase Emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
       - name: Install dependencies
         run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Checkout shared Admin contract
+        uses: actions/checkout@v4
+        with:
+          repository: gui130699/XTrainer-Admin
+          path: .contract/XTrainer-Admin
+      - name: Verify shared Firebase contract
+        run: npm run check:firebase-contract
+        env:
+          FIREBASE_CONTRACT_PEER: ${{ github.workspace }}/.contract/XTrainer-Admin
+      - name: Remove contract checkout before Next build
+        run: rm -rf .contract
       - name: Build static site
         run: npm run build
         env:
@@ -44,6 +68,6 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: out
-      - name: Deploy to GitHub Pages
+      - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4

@@ -1,0 +1,11 @@
+"use client";
+import { Check } from "lucide-react";
+import { Button, Card } from "@/components/ui";
+import { trainingStageLabel } from "@/lib/training-methods";
+import type { SessionExercise, TrainingSet, WorkoutExerciseGroup } from "@/types";
+
+export function TrainingGroupExecution({ group, members, allExercises, onChange, onComplete, onSync }: { group: WorkoutExerciseGroup; members: SessionExercise[]; allExercises: SessionExercise[]; onChange: (exerciseIndex: number, setIndex: number, data: Partial<TrainingSet>) => void; onComplete: (exerciseIndex: number, setIndex: number, completed: boolean) => void; onSync: () => void }) {
+  const rounds = Math.max(...members.map((item) => item.sets.length));
+  return <Card className="group-execution"><div className="method-execution-title"><div><p className="eyebrow">SEQUÊNCIA COMBINADA</p><h2>{group.name}</h2><span className="method-chip">{group.methodSnapshot.name}</span></div><p>{group.methodSnapshot.fullDescription}</p></div>{Array.from({ length: rounds }, (_, round) => <section className="group-round" key={round}><h3>Rodada {round + 1}</h3>{members.map((exercise, position) => { const set = exercise.sets[round]; if (!set) return null; const exerciseIndex = allExercises.findIndex((item) => item.id === exercise.id); return <div className={`set method-stage ${set.completed ? "completed" : ""}`} key={set.id}><b>{position + 1}. {exercise.name}</b><small>{trainingStageLabel(set)}</small><label className="set-field"><span>Carga</span><input type="number" min="0" step="0.1" aria-label={`Carga de ${exercise.name}, rodada ${round + 1}`} value={set.load} onChange={(event) => onChange(exerciseIndex, round, { load: Number(event.target.value) })} onBlur={onSync}/></label><span>kg ×</span><label className="set-field"><span>Reps</span><input type="number" min="0" step="1" aria-label={`Repetições de ${exercise.name}, rodada ${round + 1}`} value={set.reps} onChange={(event) => onChange(exerciseIndex, round, { reps: Number(event.target.value) })} onBlur={onSync}/></label>{set.completed ? <button className="text-button" onClick={() => onComplete(exerciseIndex, round, false)}>Desfazer <Check className="success" size={16}/></button> : <Button onClick={() => onComplete(exerciseIndex, round, true)}>CONCLUIR</Button>}</div>})}</section>)}</Card>;
+}
+

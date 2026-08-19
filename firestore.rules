@@ -1,24 +1,203 @@
 rules_version = '2';
-service cloud.firestore { match /databases/{database}/documents {
-  function signedIn() { return request.auth != null; }
-  function isAdmin() { return signedIn() && get(/databases/$(database)/documents/system/config).data.adminUid == request.auth.uid; }
-  match /system/config { allow read: if true; allow create: if signedIn() && !exists(/databases/$(database)/documents/system/config); allow update, delete: if isAdmin(); }
-  match /users/{uid} {
-    allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
-    allow create: if signedIn() && request.auth.uid == uid && (request.resource.data.role == 'user' || (!exists(/databases/$(database)/documents/system/config) && request.resource.data.role == 'admin'));
-    allow update: if isAdmin() || (signedIn() && request.auth.uid == uid && (request.resource.data.role == resource.data.role || (!exists(/databases/$(database)/documents/system/config) && request.resource.data.role == 'admin')));
-    allow delete: if isAdmin();
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/system/config)
+        && get(/databases/$(database)/documents/system/config).data.adminUid == request.auth.uid;
+    }
+
+    function ownsExisting() {
+      return signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    function createsForSelf() {
+      return signedIn() && request.resource.data.ownerId == request.auth.uid;
+    }
+
+    function preservesOwner() {
+      return request.resource.data.ownerId == resource.data.ownerId;
+    }
+
+    function validUser(data, uid) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'role'])
+        && data.keys().hasOnly(['uid', 'name', 'email', 'role', 'birthDate', 'height', 'sex', 'goal', 'photoURL', 'createdAt', 'updatedAt'])
+        && data.uid == uid
+        && data.uid is string
+        && data.name is string
+        && data.email is string
+        && data.role in ['user', 'admin']
+        && (!('birthDate' in data) || data.birthDate is string)
+        && (!('height' in data) || data.height is number)
+        && (!('sex' in data) || data.sex is string)
+        && (!('goal' in data) || data.goal is string)
+        && (!('photoURL' in data) || data.photoURL is string)
+        && (!('createdAt' in data) || data.createdAt is timestamp)
+        && (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function validExercise(data) {
+      return data.keys().hasAll(['name', 'muscleGroup', 'active'])
+        && data.keys().hasOnly(['id', 'name', 'nameEn', 'aliases', 'muscleGroup', 'muscleSubgroup', 'equipment', 'videoUrl', 'sortOrder', 'description', 'instructions', 'notes', 'active', 'createdAt', 'updatedAt'])
+        && data.name is string
+        && data.muscleGroup is string
+        && data.active is bool
+        && (!('id' in data) || data.id is string)
+        && (!('nameEn' in data) || data.nameEn is string)
+        && (!('aliases' in data) || data.aliases is list)
+        && (!('videoUrl' in data) || data.videoUrl is string)
+        && (!('sortOrder' in data) || data.sortOrder is number);
+    }
+
+    function validWorkout(data) {
+      return data.keys().hasAll(['ownerId', 'name', 'title', 'muscleGroups', 'exercises', 'active'])
+        && data.keys().hasOnly(['id', 'ownerId', 'name', 'title', 'description', 'muscleGroups', 'exercises', 'exerciseGroups', 'active', 'createdAt', 'updatedAt'])
+        && data.ownerId is string
+        && data.name is string
+        && data.title is string
+        && data.muscleGroups is list
+        && data.exercises is list
+        && (!('exerciseGroups' in data) || data.exerciseGroups is list)
+        && data.active is bool;
+    }
+
+    function validSession(data) {
+      return data.keys().hasAll(['ownerId', 'workoutId', 'workoutName', 'exercises', 'totalVolume', 'totalSets', 'status'])
+        && data.keys().hasOnly(['ownerId', 'workoutId', 'workoutName', 'startedAt', 'endedAt', 'durationSeconds', 'restEndsAt', 'exercises', 'exerciseGroups', 'totalVolume', 'totalSets', 'status', 'notes'])
+        && data.ownerId is string
+        && data.workoutId is string
+        && data.workoutName is string
+        && data.exercises is list
+        && (!('exerciseGroups' in data) || data.exerciseGroups is list)
+        && data.totalVolume is number
+        && data.totalSets is number
+        && data.status in ['active', 'completed', 'cancelled']
+        && (!('startedAt' in data) || data.startedAt is timestamp)
+        && (!('endedAt' in data) || data.endedAt is timestamp)
+        && (!('durationSeconds' in data) || data.durationSeconds is number)
+        && (!('restEndsAt' in data) || data.restEndsAt is timestamp)
+        && (!('notes' in data) || data.notes is string);
+    }
+
+    function validSessionId(data, id) {
+      return data.status != 'active' || id == 'active-' + request.auth.uid;
+    }
+
+    function validWeight(data) {
+      return data.keys().hasAll(['ownerId', 'date', 'weight'])
+        && data.keys().hasOnly(['ownerId', 'date', 'weight', 'note', 'source', 'assessmentId', 'createdAt', 'updatedAt'])
+        && data.ownerId is string
+        && data.date is string
+        && data.weight is number
+        && data.weight > 0
+        && (!('note' in data) || data.note is string)
+        && (!('source' in data) || data.source in ['manual', 'assessment'])
+        && (!('assessmentId' in data) || data.assessmentId is string);
+    }
+
+    function validAssessment(data) {
+      return data.keys().hasAll(['ownerId', 'date', 'type', 'measurements'])
+        && data.keys().hasOnly(['ownerId', 'date', 'type', 'weight', 'height', 'bodyFat', 'fatMass', 'leanMass', 'measurements', 'skinfolds', 'assessmentProtocol', 'notes', 'photos', 'createdAt', 'updatedAt'])
+        && data.ownerId is string
+        && data.date is string
+        && data.type in ['quick', 'complete', 'advanced']
+        && data.measurements is map
+        && (!('skinfolds' in data) || data.skinfolds is map)
+        && (!('photos' in data) || data.photos is map)
+        && (!('weight' in data) || (data.weight is number && data.weight > 0))
+        && (!('height' in data) || (data.height is number && data.height > 0))
+        && (!('bodyFat' in data) || data.bodyFat is number)
+        && (!('fatMass' in data) || data.fatMass is number)
+        && (!('leanMass' in data) || data.leanMass is number)
+        && (!('assessmentProtocol' in data) || data.assessmentProtocol is string)
+        && (!('notes' in data) || data.notes is string);
+    }
+
+    match /system/config {
+      allow read: if true;
+      // Provisionado somente pelo Console/Admin SDK. Não existe bootstrap público.
+      allow create, update, delete: if false;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'user'
+        && validUser(request.resource.data, uid);
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'email', 'birthDate', 'height', 'sex', 'goal', 'photoURL', 'updatedAt'])
+        && validUser(request.resource.data, uid);
+      allow delete: if false;
+    }
+
+    match /exercises/{id} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && validExercise(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /trainingMethods/{id} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /workouts/{id} {
+      allow read: if ownsExisting();
+      allow create: if createsForSelf() && validWorkout(request.resource.data);
+      allow update: if ownsExisting() && preservesOwner() && validWorkout(request.resource.data);
+      allow delete: if ownsExisting();
+    }
+
+    match /workoutSessions/{id} {
+      allow read: if ownsExisting();
+      allow create: if createsForSelf()
+        && validSession(request.resource.data)
+        && validSessionId(request.resource.data, id);
+      allow update: if ownsExisting()
+        && preservesOwner()
+        && validSession(request.resource.data)
+        && validSessionId(request.resource.data, id)
+        && (request.resource.data.status == resource.data.status
+          || (resource.data.status == 'active' && request.resource.data.status in ['completed', 'cancelled']));
+      allow delete: if ownsExisting();
+    }
+
+    match /bodyWeights/{id} {
+      allow read: if ownsExisting();
+      allow create: if createsForSelf() && validWeight(request.resource.data);
+      allow update: if ownsExisting() && preservesOwner() && validWeight(request.resource.data);
+      allow delete: if ownsExisting();
+    }
+
+    match /physicalAssessments/{id} {
+      allow read: if ownsExisting();
+      allow create: if createsForSelf() && validAssessment(request.resource.data);
+      allow update: if ownsExisting() && preservesOwner() && validAssessment(request.resource.data);
+      allow delete: if ownsExisting();
+    }
+
+    match /auditLogs/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasAll(['adminUid', 'action', 'entityType', 'entityId', 'timestamp'])
+        && request.resource.data.keys().hasOnly(['adminUid', 'action', 'entityType', 'entityId', 'summary', 'timestamp'])
+        && request.resource.data.adminUid == request.auth.uid
+        && request.resource.data.action is string
+        && request.resource.data.entityType is string
+        && request.resource.data.entityId is string
+        && request.resource.data.timestamp is timestamp
+        && (!('summary' in request.resource.data)
+          || request.resource.data.summary is string
+          || request.resource.data.summary == null);
+      allow update, delete: if false;
+    }
   }
-  match /exercises/{id} { allow read: if signedIn(); allow write: if isAdmin(); }
-  match /workouts/{id} {
-    allow read: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid);
-    allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-    allow update, delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId);
-  }
-  match /{collection}/{id} {
-    allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
-    allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-    allow update: if signedIn() && resource.data.ownerId == request.auth.uid && request.resource.data.ownerId == resource.data.ownerId;
-    allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
-  }
-} }
+}

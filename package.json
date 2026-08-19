@@ -2,7 +2,39 @@
   "name": "xtrainer",
   "version": "1.0.0",
   "private": true,
-  "scripts": { "dev": "next dev", "build": "next build", "start": "next start", "lint": "eslint ." },
-  "dependencies": { "@hookform/resolvers": "^5.1.1", "date-fns": "^4.1.0", "firebase": "^11.10.0", "lucide-react": "^0.468.0", "next": "^15.3.4", "react": "^19.0.0", "react-dom": "^19.0.0", "react-hook-form": "^7.60.0", "recharts": "^2.15.1", "zod": "^3.24.1" },
-  "devDependencies": { "@eslint/eslintrc": "^3.2.0", "@types/node": "^22.10.2", "@types/react": "^19.0.2", "@types/react-dom": "^19.0.2", "eslint": "^9.17.0", "eslint-config-next": "^15.3.4", "typescript": "^5.7.2" }
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "tsx --test tests/*.test.ts",
+    "test:rules": "firebase emulators:exec --only firestore --project xtrainer-45f8d \"node --test tests/firestore.rules.test.mjs\"",
+    "test": "npm run test:unit && npm run test:rules",
+    "check:firebase-contract": "node scripts/check-firebase-contract.mjs"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.1.1",
+    "date-fns": "^4.1.0",
+    "firebase": "^11.10.0",
+    "lucide-react": "^0.468.0",
+    "next": "^16.3.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.60.0",
+    "recharts": "^2.15.1",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.2.0",
+    "@firebase/rules-unit-testing": "^4.0.1",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "^16.3.1",
+    "firebase-tools": "^15.27.0",
+    "tsx": "^4.23.12",
+    "typescript": "^5.7.2"
+  }
 }

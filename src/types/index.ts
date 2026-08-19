@@ -1,13 +1,278 @@
 import type { Timestamp } from "firebase/firestore";
+
 export type Id = string;
-export interface UserProfile { uid: Id; name: string; email: string; role: "admin" | "user"; birthDate?: string; height?: number; sex?: string; goal?: string; photoURL?: string; createdAt?: Timestamp }
-export interface Exercise { id: Id; name: string; nameEn?: string; aliases?: string[]; muscleGroup: string; muscleSubgroup?: string; equipment?: string; videoUrl?: string; sortOrder?: number; description?: string; instructions?: string; notes?: string; active: boolean; createdAt?: Timestamp; updatedAt?: Timestamp }
-export interface DefaultExercise { id: Id; name: string; nameEn: string; aliases?: string[]; muscleGroup: string; videoUrl: string; active: boolean; sortOrder: number }
-export interface SeedResult { total: number; created: number; updated: number; skipped: number; errors: number }
-export interface WorkoutExercise { id: Id; exerciseId: Id; name: string; order: number; sets: number; repsMin: number; repsMax: number; restSeconds: number; suggestedLoad?: number; notes?: string }
-export interface Workout { id: Id; ownerId: Id; name: string; title: string; description?: string; muscleGroups: string[]; exercises: WorkoutExercise[]; active: boolean; createdAt?: Timestamp; updatedAt?: Timestamp }
-export interface TrainingSet { id: Id; load: number; reps: number; rpe?: number; rir?: number; completed: boolean; completedAt?: Timestamp; volume: number }
-export interface SessionExercise { id: Id; exerciseId: Id; name: string; order: number; target: WorkoutExercise; sets: TrainingSet[] }
-export interface WorkoutSession { id: Id; ownerId: Id; workoutId: Id; workoutName: string; startedAt?: Timestamp; endedAt?: Timestamp; durationSeconds?: number; exercises: SessionExercise[]; totalVolume: number; totalSets: number; status: "active" | "completed" | "cancelled"; notes?: string }
-export interface BodyWeight { id: Id; ownerId: Id; date: string; weight: number; note?: string; createdAt?: Timestamp }
-export interface PhysicalAssessment { id: Id; ownerId: Id; date: string; type: "quick" | "complete"; weight?: number; height?: number; bodyFat?: number; leanMass?: number; measurements: Record<string, number | undefined>; notes?: string; photos?: Record<string, string>; createdAt?: Timestamp }
+export type SyncStatus = "idle" | "saving" | "saved" | "error" | "offline";
+export type AssessmentType = "quick" | "complete" | "advanced";
+export type BodyWeightSource = "manual" | "assessment";
+export type AssessmentPhotoView = "front" | "side" | "back";
+
+export interface UserProfile {
+  uid: Id;
+  name: string;
+  email: string;
+  role: "admin" | "user";
+  birthDate?: string;
+  height?: number;
+  sex?: string;
+  goal?: string;
+  photoURL?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface SystemConfig {
+  initialized: boolean;
+  adminUid: string;
+  updatedAt?: Timestamp;
+}
+
+export interface Exercise {
+  id: Id;
+  name: string;
+  nameEn?: string;
+  aliases?: string[];
+  muscleGroup: string;
+  muscleSubgroup?: string;
+  equipment?: string;
+  videoUrl?: string;
+  sortOrder?: number;
+  description?: string;
+  instructions?: string;
+  notes?: string;
+  active: boolean;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface DefaultExercise {
+  id: Id;
+  name: string;
+  nameEn: string;
+  aliases?: string[];
+  muscleGroup: string;
+  muscleSubgroup?: string;
+  equipment?: string;
+  videoUrl: string;
+  active: boolean;
+  sortOrder: number;
+}
+
+export interface SeedResult {
+  total: number;
+  created: number;
+  updated: number;
+  deleted: number;
+  skipped: number;
+  errors: number;
+}
+
+export type TrainingMethodCategory = "traditional" | "warmup" | "group" | "intensity" | "progression" | "tempo" | "failure" | "time" | "advanced";
+export type TrainingMethodEngine = "normal" | "group" | "drop" | "rest-pause" | "cluster" | "progression" | "top-backoff" | "tempo" | "failure" | "amrap" | "isometric" | "partials" | "myo-reps" | "time";
+export type TrainingMethodFieldType = "number" | "integer" | "percentage" | "seconds" | "reps" | "boolean" | "select" | "text" | "tempo" | "load";
+export type TrainingTempo = { eccentric: number; pause: number; concentric: number; top: number };
+export type TrainingMethodConfigValue = string | number | boolean | TrainingTempo | null;
+
+export interface TrainingMethodFieldOption { label: string; value: string }
+export interface TrainingMethodConfigField {
+  key: string;
+  label: string;
+  type: TrainingMethodFieldType;
+  required?: boolean;
+  min?: number;
+  max?: number;
+  step?: number;
+  help?: string;
+  options?: TrainingMethodFieldOption[];
+}
+export interface TrainingMethodCapabilities {
+  sets: boolean;
+  reps: boolean;
+  load: boolean;
+  rest: boolean;
+  rir: boolean;
+  rpe: boolean;
+  tempo: boolean;
+  duration: boolean;
+  group: boolean;
+}
+export interface TrainingMethodExerciseRules {
+  minExercises: number;
+  maxExercises: number;
+  sameMuscleGroup?: boolean;
+}
+export interface TrainingMethod {
+  id: Id;
+  name: string;
+  shortDescription: string;
+  fullDescription: string;
+  category: TrainingMethodCategory;
+  engine: TrainingMethodEngine;
+  iconKey: string;
+  order: number;
+  active: boolean;
+  system: boolean;
+  version: number;
+  capabilities: TrainingMethodCapabilities;
+  exerciseRules: TrainingMethodExerciseRules;
+  configFields: TrainingMethodConfigField[];
+  defaults: Record<string, TrainingMethodConfigValue>;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+export type TrainingMethodSnapshot = Omit<TrainingMethod, "createdAt" | "updatedAt">;
+export interface TrainingMethodConfig {
+  methodId: Id;
+  values: Record<string, TrainingMethodConfigValue>;
+}
+export interface WorkoutExerciseGroup {
+  id: Id;
+  name: string;
+  order: number;
+  exerciseIds: Id[];
+  methodConfig: TrainingMethodConfig;
+  methodSnapshot: TrainingMethodSnapshot;
+}
+
+export interface WorkoutExercise {
+  id: Id;
+  exerciseId: Id;
+  name: string;
+  order: number;
+  sets: number;
+  repsMin: number;
+  repsMax: number;
+  restSeconds: number;
+  suggestedLoad?: number;
+  notes?: string;
+  methodConfig?: TrainingMethodConfig;
+  methodSnapshot?: TrainingMethodSnapshot;
+  groupId?: Id;
+  groupPosition?: number;
+}
+
+export interface Workout {
+  id: Id;
+  ownerId: Id;
+  name: string;
+  title: string;
+  description?: string;
+  muscleGroups: string[];
+  exercises: WorkoutExercise[];
+  exerciseGroups?: WorkoutExerciseGroup[];
+  active: boolean;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface TrainingSet {
+  id: Id;
+  load: number;
+  reps: number;
+  rpe?: number;
+  rir?: number;
+  completed: boolean;
+  completedAt?: Timestamp;
+  volume: number;
+  methodId?: Id;
+  methodEngine?: TrainingMethodEngine;
+  methodVersion?: number;
+  blockId?: Id;
+  blockIndex?: number;
+  stageIndex?: number;
+  stageCount?: number;
+  setRole?: "working" | "warmup" | "ramp" | "drop" | "pause" | "cluster" | "backoff" | "isometric" | "partial" | "timed";
+  durationSeconds?: number;
+  tempo?: TrainingTempo;
+  restAfterSeconds?: number;
+  toFailure?: boolean;
+}
+
+export interface SessionExercise {
+  id: Id;
+  exerciseId: Id;
+  name: string;
+  order: number;
+  target: WorkoutExercise;
+  sets: TrainingSet[];
+}
+
+export interface WorkoutSession {
+  id: Id;
+  ownerId: Id;
+  workoutId: Id;
+  workoutName: string;
+  startedAt?: Timestamp;
+  endedAt?: Timestamp;
+  durationSeconds?: number;
+  restEndsAt?: Timestamp;
+  exercises: SessionExercise[];
+  exerciseGroups?: WorkoutExerciseGroup[];
+  totalVolume: number;
+  totalSets: number;
+  status: "active" | "completed" | "cancelled";
+  notes?: string;
+}
+
+export interface BodyWeight {
+  id: Id;
+  ownerId: Id;
+  date: string;
+  weight: number;
+  note?: string;
+  source?: BodyWeightSource;
+  assessmentId?: Id;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface BodyMeasurements {
+  neck?: number;
+  shoulders?: number;
+  chest?: number;
+  armRightRelaxed?: number;
+  armLeftRelaxed?: number;
+  armRightFlexed?: number;
+  armLeftFlexed?: number;
+  forearmRight?: number;
+  forearmLeft?: number;
+  waist?: number;
+  abdomen?: number;
+  hip?: number;
+  thighRight?: number;
+  thighLeft?: number;
+  calfRight?: number;
+  calfLeft?: number;
+  [key: string]: number | undefined;
+}
+
+export interface Skinfolds {
+  triceps?: number;
+  biceps?: number;
+  subscapular?: number;
+  suprailiac?: number;
+  abdominal?: number;
+  chest?: number;
+  midaxillary?: number;
+  thigh?: number;
+  calf?: number;
+  [key: string]: number | undefined;
+}
+
+export interface PhysicalAssessment {
+  id: Id;
+  ownerId: Id;
+  date: string;
+  type: AssessmentType;
+  weight?: number;
+  height?: number;
+  bodyFat?: number;
+  fatMass?: number;
+  leanMass?: number;
+  measurements: BodyMeasurements;
+  skinfolds?: Skinfolds;
+  assessmentProtocol?: string;
+  notes?: string;
+  photos?: Partial<Record<AssessmentPhotoView, string>>;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
