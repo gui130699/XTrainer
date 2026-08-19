@@ -11,13 +11,11 @@ import {
   query,
   runTransaction,
   serverTimestamp,
-  startAfter,
   Timestamp,
   updateDoc,
   where,
   writeBatch,
   type DocumentData,
-  type QueryConstraint,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
@@ -305,47 +303,24 @@ export const sessions = {
     }
   },
   listCompletedPage: async (uid: string, pageSize = 20, cursor?: QueryDocumentSnapshot<DocumentData> | null): Promise<SessionPage> => {
-    try {
-      const constraints: QueryConstraint[] = [where("ownerId", "==", uid), where("status", "==", "completed"), orderBy("startedAt", "desc"), limit(pageSize)];
-      if (cursor) constraints.splice(constraints.length - 1, 0, startAfter(cursor));
-      const snapshot = await getDocs(query(collection(db, "workoutSessions"), ...constraints));
-      return {
-        items: snapshot.docs.map((item) => normalizeWorkoutSessionDocument(item.id, item.data())),
-        cursor: snapshot.docs.at(-1) ?? null,
-        hasMore: snapshot.docs.length === pageSize,
-      };
-    } catch (reason) {
-      if (!missingIndex(reason)) throw reason;
-      const documents = (await listOwnerDocuments("workoutSessions", uid)).docs
-        .filter((item) => item.data().status === "completed")
-        .sort((a, b) => sessionStartedAt(normalizeWorkoutSessionDocument(b.id, b.data())) - sessionStartedAt(normalizeWorkoutSessionDocument(a.id, a.data())));
-      const start = cursor ? Math.max(0, documents.findIndex((item) => item.id === cursor.id) + 1) : 0;
-      const page = documents.slice(start, start + pageSize);
-      return {
-        items: page.map((item) => normalizeWorkoutSessionDocument(item.id, item.data())),
-        cursor: page.at(-1) ?? null,
-        hasMore: start + page.length < documents.length,
-      };
-    }
+    const documents = (await listOwnerDocuments("workoutSessions", uid)).docs
+      .filter((item) => item.data().status === "completed")
+      .sort((a, b) => sessionStartedAt(normalizeWorkoutSessionDocument(b.id, b.data())) - sessionStartedAt(normalizeWorkoutSessionDocument(a.id, a.data())));
+    const start = cursor ? Math.max(0, documents.findIndex((item) => item.id === cursor.id) + 1) : 0;
+    const page = documents.slice(start, start + pageSize);
+    return {
+      items: page.map((item) => normalizeWorkoutSessionDocument(item.id, item.data())),
+      cursor: page.at(-1) ?? null,
+      hasMore: start + page.length < documents.length,
+    };
   },
   listCompletedBetween: async (uid: string, start: Date, end: Date) => {
-    try {
-      return (await getDocs(query(collection(db, "workoutSessions"),
-        where("ownerId", "==", uid),
-        where("status", "==", "completed"),
-        where("startedAt", ">=", Timestamp.fromDate(start)),
-        where("startedAt", "<", Timestamp.fromDate(end)),
-        orderBy("startedAt", "desc"),
-      ))).docs.map((item) => normalizeWorkoutSessionDocument(item.id, item.data()));
-    } catch (reason) {
-      if (!missingIndex(reason)) throw reason;
-      const startMillis = start.getTime();
-      const endMillis = end.getTime();
-      return (await listOwnerDocuments("workoutSessions", uid)).docs
-        .map((item) => normalizeWorkoutSessionDocument(item.id, item.data()))
-        .filter((item) => item.status === "completed" && sessionStartedAt(item) >= startMillis && sessionStartedAt(item) < endMillis)
-        .sort((a, b) => sessionStartedAt(b) - sessionStartedAt(a));
-    }
+    const startMillis = start.getTime();
+    const endMillis = end.getTime();
+    return (await listOwnerDocuments("workoutSessions", uid)).docs
+      .map((item) => normalizeWorkoutSessionDocument(item.id, item.data()))
+      .filter((item) => item.status === "completed" && sessionStartedAt(item) >= startMillis && sessionStartedAt(item) < endMillis)
+      .sort((a, b) => sessionStartedAt(b) - sessionStartedAt(a));
   },
   listAllCompleted: async (uid: string, pageSize = 100) => {
     const items: WorkoutSession[] = [];
