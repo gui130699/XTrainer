@@ -1,0 +1,49 @@
+.composition-result {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid #0e7490;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #082f49cc, #07111f);
+}
+
+.composition-result > div {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #07111fcc;
+}
+
+.composition-result span {
+  color: #a5f3fc;
+  font-size: 12px;
+}
+
+.composition-result strong {
+  color: #f4f8fb;
+  font-size: 24px;
+}
+
+.composition-result p {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  color: #a8bacb;
+  font-size: 13px;
+}
+
+.form-error {
+  padding: 12px 14px;
+  border: 1px solid #7f1d1d;
+  border-radius: 10px;
+  background: #450a0a4d;
+  color: #fecaca;
+}
+
+@media (max-width: 700px) {
+  .composition-result {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./assessment.css";
 import "./training-methods.css";
 import { Providers } from "@/components/providers";
 import { InstallAppButton } from "@/components/install-app-button";
