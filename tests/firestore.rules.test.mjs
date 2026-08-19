@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { after, before, test } from "node:test";
 import { assertFails, assertSucceeds, initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { collection, deleteDoc, doc, getDoc, getDocs, runTransaction, setDoc, Timestamp, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, deleteField, doc, getDoc, getDocs, runTransaction, setDoc, Timestamp, updateDoc } from "firebase/firestore";
 
 let environment;
 let anonymous;
@@ -57,6 +57,21 @@ test("usuário vê somente o próprio perfil e dados corporais", async () => {
     await assertSucceeds(getDoc(doc(userA, path)));
     await assertFails(getDoc(doc(userB, path)));
   }
+});
+
+test("usuário atualiza os próprios dados pessoais sem alterar identidade ou papel", async () => {
+  const reference = doc(userA, "users", "user-a");
+  await assertSucceeds(updateDoc(reference, {
+    name: "Usuário atualizado",
+    height: 171,
+    goal: "Hipertrofia",
+    birthDate: "1999-05-13",
+    sex: "male",
+    updatedAt: Timestamp.now(),
+  }));
+  await assertSucceeds(updateDoc(reference, { birthDate: deleteField(), sex: deleteField(), updatedAt: Timestamp.now() }));
+  await assertFails(updateDoc(reference, { uid: "user-b" }));
+  await assertFails(updateDoc(reference, { role: "admin" }));
 });
 
 test("usuário lê exercícios, mas somente admin altera a biblioteca", async () => {
