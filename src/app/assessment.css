@@ -42,6 +42,56 @@
   color: #fecaca;
 }
 
+.assessment-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 4px;
+  padding: 18px;
+  border: 1px solid #29455e;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #0d1b29, #0a1622);
+}
+
+.assessment-save-button,
+.assessment-cancel-button {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  border-radius: 11px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .35px;
+}
+
+.assessment-save-button {
+  min-width: 205px;
+  background: linear-gradient(135deg, #0ea5e9, #0879bd);
+  box-shadow: 0 8px 22px #0b5ea84d;
+}
+
+.assessment-cancel-button {
+  min-width: 125px;
+  border: 1px solid #455d74;
+  background: #111f2e;
+  color: #dce8f4;
+}
+
+.assessment-cancel-button:hover {
+  border-color: #6b8298;
+  background: #18283a;
+  color: #fff;
+}
+
+.assessment-cancel-button:focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+}
+
 .weight-toolbar {
   display: grid;
   grid-template-columns: max-content minmax(190px, 240px);
@@ -142,6 +192,18 @@
   }
 
   .weight-register-button {
+    width: 100%;
+  }
+
+  .assessment-form-actions {
+    align-items: stretch;
+    display: grid;
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .assessment-save-button,
+  .assessment-cancel-button {
     width: 100%;
   }
 

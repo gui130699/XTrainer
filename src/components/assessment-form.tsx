@@ -13,6 +13,7 @@ import {
 } from "@/lib/body-assessments";
 import { parseBrazilianNumber } from "@/lib/utils";
 import type { AssessmentPhotoView, AssessmentType, BodyMeasurements, PhysicalAssessment, Skinfolds } from "@/types";
+import { Save, X } from "lucide-react";
 import { useState } from "react";
 
 export interface AssessmentFormValue {
@@ -174,7 +175,7 @@ export function AssessmentForm({ mode, initial, saving, profileBirthDate, profil
     <details open><summary>Observações</summary><label>Observações<textarea name="notes" defaultValue={initial?.notes}/></label></details>
     {formError && <p className="form-error" role="alert">{formError}</p>}
     <p className="muted">A composição corporal é uma estimativa antropométrica e depende da técnica e precisão das medidas. Não substitui avaliação clínica.</p>
-    <div className="actions"><Button disabled={saving}>{saving ? "SALVANDO..." : initial ? "ATUALIZAR AVALIAÇÃO" : "SALVAR AVALIAÇÃO"}</Button><button type="button" className="text-button" onClick={onCancel} disabled={saving}>Cancelar</button></div>
+    <div className="assessment-form-actions"><Button className="assessment-save-button" disabled={saving}><Save size={17}/>{saving ? "SALVANDO..." : initial ? "ATUALIZAR AVALIAÇÃO" : "SALVAR AVALIAÇÃO"}</Button><button type="button" className="assessment-cancel-button" onClick={onCancel} disabled={saving}><X size={17}/> CANCELAR</button></div>
   </form>;
 }
 
