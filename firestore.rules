@@ -157,7 +157,9 @@ service cloud.firestore {
     }
 
     match /workoutSessions/{id} {
-      allow read: if ownsExisting();
+      allow get: if ownsExisting()
+        || (signedIn() && id == 'active-' + request.auth.uid);
+      allow list: if ownsExisting();
       allow create: if createsForSelf()
         && validSession(request.resource.data)
         && validSessionId(request.resource.data, id);
