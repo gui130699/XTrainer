@@ -2,25 +2,25 @@
 XTRAINER — DOCUMENTAÇÃO TÉCNICA, FUNCIONAL E OPERACIONAL COMPLETA
 ================================================================================
 
-Versão: 3.0
+Versão: 3.1
 Data: 22/08/2026
 Projetos: XTrainer e XTrainer-Admin
 Firebase compartilhado: xtrainer-45f8d
-Estado documentado: código-fonte do repositório XTrainer após a remoção de fotos/Storage,
-a fila de sincronização offline revisada, a exportação de histórico e a integração do
-Claude Code via GitHub Actions.
+Estado documentado: código-fonte dos dois repositórios após a remoção de fotos/Storage,
+a correção do deploy no GitHub Pages, a data no cabeçalho do painel e o novo módulo
+Saúde e Terapias com biblioteca educativa de substâncias.
 
 Este documento substitui a versão 2.0 (18/08/2026) para o repositório XTrainer. Todo o
 conteúdo relativo ao XTrainer foi reverificado diretamente no código-fonte nesta sessão
-(build, lint, typecheck e testes executados com sucesso). O conteúdo relativo ao
-XTrainer-Admin foi mantido a partir da versão anterior por não ter sido tocado nesta
-sessão — está claramente identificado onde isso se aplica. README.md, FIRESTORE_SCHEMA.md,
-CONTRATO_COMPARTILHADO.md, CHECKLIST_FUNCIONAL.md, MAPA_DO_SISTEMA.md,
-PENDENCIAS_E_MELHORIAS.md e RELATORIO_IMPLEMENTACAO_METODOS.md são documentos
-operacionais complementares mantidos junto do código; a fonte definitiva é sempre o
-código dos dois repositórios.
+(build, lint, typecheck e testes executados com sucesso), incluindo desta vez também o
+XTrainer-Admin (novas rotas/serviços de /substancias, build e typecheck verificados).
+README.md, FIRESTORE_SCHEMA.md, CONTRATO_COMPARTILHADO.md, CHECKLIST_FUNCIONAL.md,
+MAPA_DO_SISTEMA.md, PENDENCIAS_E_MELHORIAS.md e RELATORIO_IMPLEMENTACAO_METODOS.md são
+documentos operacionais complementares mantidos junto do código; a fonte definitiva é
+sempre o código dos dois repositórios.
 
-A seção 32 lista, de forma objetiva, tudo que mudou desde a versão 2.0.
+A seção 32 lista, de forma objetiva, tudo que mudou desde a versão 2.0. A seção 33
+detalha o módulo Saúde e Terapias e a biblioteca de referência de substâncias.
 
 ================================================================================
 1. OBJETIVO DO PRODUTO
@@ -1224,6 +1224,73 @@ documentação e agora, em ordem cronológica aproximada:
 17. Campo de data de nascimento do perfil trocado de calendário nativo para três
     seletores Dia/Mês/Ano, eliminando a necessidade de navegar mês a mês até achar o
     ano de nascimento.
+18. Correção do deploy no GitHub Pages: check:firebase-contract ainda exigia
+    storage.rules (removido do XTrainer na mudança 16, mas ainda presente no
+    XTrainer-Admin). Sincronizados os dois repositórios sem Storage e removido
+    storage.rules da lista de arquivos comparados pelo contrato.
+19. Data do dia adicionada ao cabeçalho do painel pessoal (formato "Sábado, 22 de
+    agosto de 2026", pt-BR, calculada com Intl.DateTimeFormat).
+20. Novo módulo privado "Saúde e Terapias" (rota /saude) e biblioteca educativa
+    separada "Referência de substâncias" (rota /referencia). Detalhes na seção 33.
+
+================================================================================
+33. MÓDULO SAÚDE E TERAPIAS E REFERÊNCIA DE SUBSTÂNCIAS (2026-08-22)
+================================================================================
+
+Objetivo: permitir que o usuário registre terapias/medicações já prescritas ou
+informadas por ele mesmo, com agenda, lembretes, histórico e exportação para
+calendário. O aplicativo NÃO prescreve medicamentos, NÃO recomenda substâncias, NÃO
+determina dose, NÃO determina frequência e NÃO cria protocolos — todo dado de
+substância, quantidade e frequência é digitado pelo próprio usuário; o sistema apenas
+organiza, calcula o calendário local, lembra e registra o que já aconteceu.
+
+Rotas novas no XTrainer: /saude (terapias privadas) e /referencia (biblioteca
+educativa global, arquiteturalmente separada — sem vínculo automático com as
+terapias privadas do usuário). Rota nova no XTrainer-Admin: /substancias (CRUD da
+biblioteca educativa).
+
+Collections novas:
+
+- therapies (privada, somente owner): nome, início, data final ou contínua, status
+  (active/paused/completed), lista de medicamentos com frequência (intervalo em
+  dias, dias da semana ou datas personalizadas), observações, lembrete opcional.
+- therapyAdministrations (privada, somente owner): um documento por registro de
+  confirmação/pulo/adiamento — nunca para datas futuras ainda não resolvidas. O
+  calendário futuro é sempre calculado localmente (src/lib/therapy-schedule.ts),
+  nunca persistido com antecedência, para não gerar milhares de documentos.
+- substanceReferences (global, leitura para autenticados, escrita somente admin):
+  nome, nome canônico, aliases, classe, descrição, mecanismo/função geral, uso
+  médico/histórico, categorias de risco (riskTags) e fontes. Não contém dose,
+  intervalo, ciclo, stack nem combinação recomendada.
+
+Funções puras testadas (tests/therapy-schedule.test.ts,
+tests/therapy-calendar-export.test.ts, tests/substance-analysis.test.ts):
+
+- calculateScheduleDates/calculateNextAdministration/calculateDueAdministrations/
+  calculateOverdueAdministrations (src/lib/therapy-schedule.ts) — geram e filtram
+  datas previstas sem depender do Firestore; terapias contínuas sempre respeitam um
+  horizonte finito informado pelo chamador (nunca geram data infinita).
+- buildTherapyCalendarEvents/buildIcsFile/buildTherapyIcs
+  (src/lib/therapy-calendar-export.ts) — exportação para .ics com horizonte
+  limitado (padrão 90 dias para terapias contínuas), para lembretes via calendário
+  do sistema operacional, já que o PWA é estático no GitHub Pages e não tem
+  notificação agendada confiável com o app fechado.
+- analyzeSubstanceReferenceOverlap (src/lib/substance-analysis.ts) — conta apenas
+  categorias de risco compartilhadas entre substâncias selecionadas pelo usuário na
+  tela de referência; nunca classifica combinação como seguros/segura ou recomenda
+  uso conjunto.
+
+Notificações: reutiliza a infraestrutura já usada pelo cronômetro de descanso
+(helper extraído para src/lib/notifications.ts, também usado por src/app/treino/
+page.tsx). Ao abrir /saude com permissão concedida, uma notificação resume quantos
+registros estão previstos para o dia; documentado que isso só funciona com o app
+aberto — não há push confiável com o PWA totalmente fechado nesta arquitetura
+estática.
+
+Firestore Rules: matches explícitos para therapies (owner-only), therapyAdministra-
+tions (owner-only) e substanceReferences (signedIn read / admin write), sem
+catch-all. Testes de regra novos em tests/firestore.rules.test.mjs cobrem
+privacidade (admin não lê terapias de ninguém) e escrita restrita da biblioteca.
 
 ================================================================================
 FIM DA DOCUMENTAÇÃO

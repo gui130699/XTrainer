@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { authSchemasByMode, workoutExerciseIssue, workoutFormSchema } from "../src/lib/validation";
+import { authSchemasByMode, medicationScheduleSchema, therapySchema, workoutExerciseIssue, workoutFormSchema } from "../src/lib/validation";
 
 test("login exige e-mail válido e senha com pelo menos 6 caracteres", () => {
   assert.equal(authSchemasByMode.login.safeParse({ email: "not-an-email", password: "123456" }).success, false);
@@ -47,4 +47,29 @@ test("workoutFormSchema exige nome, título e ao menos um exercício", () => {
   assert.equal(workoutFormSchema.safeParse({ name: "", title: "Peito", exercises: [validExercise] }).success, false);
   assert.equal(workoutFormSchema.safeParse({ name: "Treino A", title: "", exercises: [validExercise] }).success, false);
   assert.equal(workoutFormSchema.safeParse({ name: "Treino A", title: "Peito", exercises: [] }).success, false);
+});
+
+test("medicationScheduleSchema rejeita dias da semana e datas repetidas", () => {
+  assert.equal(medicationScheduleSchema.safeParse({ type: "interval", intervalDays: 0 }).success, false);
+  assert.equal(medicationScheduleSchema.safeParse({ type: "interval", intervalDays: 7 }).success, true);
+  assert.equal(medicationScheduleSchema.safeParse({ type: "weekdays", weekdays: [] }).success, false);
+  assert.equal(medicationScheduleSchema.safeParse({ type: "weekdays", weekdays: [1, 1] }).success, false);
+  assert.equal(medicationScheduleSchema.safeParse({ type: "weekdays", weekdays: [1, 4] }).success, true);
+  assert.equal(medicationScheduleSchema.safeParse({ type: "custom", dates: [] }).success, false);
+  assert.equal(medicationScheduleSchema.safeParse({ type: "custom", dates: ["2026-08-22", "2026-08-22"] }).success, false);
+  assert.equal(medicationScheduleSchema.safeParse({ type: "custom", dates: ["2026-08-22"] }).success, true);
+});
+
+test("therapySchema exige data final quando não é contínua e proíbe data final quando é", () => {
+  const medication = { name: "Medicamento A", schedule: { type: "interval" as const, intervalDays: 7 } };
+  assert.equal(therapySchema.safeParse({ name: "Terapia", startDate: "2026-08-01", continuous: false, medications: [medication] }).success, false);
+  assert.equal(therapySchema.safeParse({ name: "Terapia", startDate: "2026-08-01", endDate: "2026-08-31", continuous: false, medications: [medication] }).success, true);
+  assert.equal(therapySchema.safeParse({ name: "Terapia", startDate: "2026-08-01", endDate: "2026-08-31", continuous: true, medications: [medication] }).success, false);
+  assert.equal(therapySchema.safeParse({ name: "Terapia", startDate: "2026-08-01", continuous: true, medications: [medication] }).success, true);
+});
+
+test("therapySchema rejeita data final anterior ao início e exige ao menos um medicamento", () => {
+  const medication = { name: "Medicamento A", schedule: { type: "interval" as const, intervalDays: 7 } };
+  assert.equal(therapySchema.safeParse({ name: "Terapia", startDate: "2026-08-20", endDate: "2026-08-01", continuous: false, medications: [medication] }).success, false);
+  assert.equal(therapySchema.safeParse({ name: "Terapia", startDate: "2026-08-01", endDate: "2026-08-31", continuous: false, medications: [] }).success, false);
 });

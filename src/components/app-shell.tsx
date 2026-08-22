@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { BarChart3, Dumbbell, History, Home, LogOut, UserRound } from "lucide-react";
+import { BarChart3, Dumbbell, HeartPulse, History, Home, LogOut, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppLogo } from "@/components/app-logo";
 import { useAuth } from "@/components/providers";
 import { logout } from "@/services/auth";
 
-const links = [["/", "Início", Home], ["/treino", "Treino", Dumbbell], ["/evolucao", "Evolução", BarChart3], ["/historico", "Histórico", History], ["/perfil", "Perfil", UserRound]] as const;
+const links = [["/", "Início", Home], ["/treino", "Treino", Dumbbell], ["/evolucao", "Evolução", BarChart3], ["/historico", "Histórico", History], ["/saude", "Saúde", HeartPulse], ["/perfil", "Perfil", UserRound]] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);

@@ -273,3 +273,81 @@ export interface PhysicalAssessment {
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
+
+export type TherapyStatus = "active" | "paused" | "completed";
+export type AdministrationStatus = "completed" | "skipped" | "postponed";
+
+export type MedicationSchedule =
+  | { type: "interval"; intervalDays: number }
+  | { type: "weekdays"; weekdays: number[] }
+  | { type: "custom"; dates: string[] };
+
+export interface TherapyMedication {
+  id: Id;
+  name: string;
+  formulation?: string;
+  schedule: MedicationSchedule;
+  reportedAmount?: number;
+  reportedUnit?: string;
+  notes?: string;
+}
+
+export interface Therapy {
+  id: Id;
+  ownerId: Id;
+  name: string;
+  startDate: string;
+  endDate?: string;
+  continuous: boolean;
+  status: TherapyStatus;
+  medications: TherapyMedication[];
+  notes?: string;
+  reminderOffsetDays?: number;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface TherapyAdministration {
+  id: Id;
+  ownerId: Id;
+  therapyId: Id;
+  medicationId: Id;
+  scheduledDate: string;
+  actualDate?: string;
+  status: AdministrationStatus;
+  reportedAmount?: number;
+  reportedUnit?: string;
+  notes?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export type SubstanceReferenceRiskTag =
+  | "cardiovascular"
+  | "hepatic"
+  | "renal"
+  | "endocrine"
+  | "psychiatric"
+  | "dermatologic"
+  | "allergic"
+  | "metabolic"
+  | "hematologic"
+  | "unknown-long-term";
+
+export interface SubstanceReference {
+  id: Id;
+  name: string;
+  canonicalName?: string;
+  aliases?: string[];
+  class?: string;
+  description: string;
+  mechanismSummary?: string;
+  medicalUseSummary?: string;
+  riskTags: SubstanceReferenceRiskTag[];
+  sources?: string[];
+  active: boolean;
+  isSystem: boolean;
+  sortOrder: number;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}

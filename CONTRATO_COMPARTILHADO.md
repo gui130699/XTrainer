@@ -6,9 +6,11 @@ O Firebase é único (`xtrainer-45f8d`). O XTrainer Admin é a referência opera
 
 - `firestore.rules`;
 - `firestore.indexes.json`;
-- `storage.rules`;
 - `src/types/index.ts`;
-- `src/data/default-exercises.ts`.
+- `src/data/default-exercises.ts`;
+- `src/data/default-training-methods.ts`.
+
+O projeto não usa Firebase Storage: fotos foram removidas do XTrainer (perfil e avaliação física) e não há `storage.rules` em nenhum dos dois repositórios.
 
 O comando `npm run check:firebase-contract` compara os repositórios locais. No CI, o workflow baixa o repositório irmão e bloqueia deploy quando existe drift.
 
@@ -20,15 +22,18 @@ XTrainer:
 - mantém perfil e todos os dados privados do owner;
 - cria treinos e executa sessões;
 - registra evolução corporal;
-- deriva analytics de sessões concluídas.
+- deriva analytics de sessões concluídas;
+- registra terapias/medicações privadas (`therapies`, `therapyAdministrations`) informadas pelo próprio usuário, sem prescrever, recomendar substância, dose, frequência ou protocolo;
+- lê a biblioteca educativa global de substâncias (`substanceReferences`).
 
 XTrainer Admin:
 
 - autentica apenas o UID configurado;
 - lista identificação mínima de contas;
 - cria, edita, ativa/desativa, importa e exporta exercícios;
+- cria, edita e ativa/desativa a biblioteca educativa de substâncias (`substanceReferences`);
 - grava audit logs;
-- não consulta dados privados do usuário.
+- não consulta dados privados do usuário, incluindo terapias e registros de aplicação.
 
 Firebase/ambiente confiável:
 
@@ -43,12 +48,12 @@ Firebase/ambiente confiável:
 2. Novo usuário sempre começa como `role: user`.
 3. Admin é `request.auth.uid == system/config.adminUid`.
 4. `ownerId` não pode mudar.
-5. Admin não lê/grava workouts, sessions, weights ou assessments.
-6. Fotos só podem ser acessadas pelo UID dono.
-7. Coleção não declarada é negada.
-8. Audit log é imutável.
-9. Sessão ativa só pode usar `active-{uid}`.
-10. Sessão histórica nunca volta a ativa.
+5. Admin não lê/grava workouts, sessions, weights, assessments, therapies ou therapyAdministrations.
+6. Coleção não declarada é negada.
+7. Audit log é imutável.
+8. Sessão ativa só pode usar `active-{uid}`.
+9. Sessão histórica nunca volta a ativa.
+10. `substanceReferences` é educativo: nunca grava dose, intervalo, ciclo ou combinação recomendada; leitura livre para autenticados, escrita somente admin.
 
 ## Contrato de catálogo
 

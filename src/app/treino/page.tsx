@@ -11,6 +11,7 @@ import { TrainingGroupExecution } from "@/components/training-methods/training-g
 import { detectNewRecords, timestampDate, type RecordEvent } from "@/lib/training-analytics";
 import { createMethodConfig, normalTrainingMethod, snapshotMethod } from "@/lib/training-methods";
 import { dataErrorMessage, exerciseMuscleGroups, normalizeSearchText } from "@/lib/utils";
+import { NOTIFICATION_ICON } from "@/lib/notifications";
 import { exercises, sessions, workouts } from "@/services/data";
 import { trainingMethodsService } from "@/services/training-methods";
 import type { Exercise, SyncStatus, TrainingMethod, TrainingSet, Workout, WorkoutExercise, WorkoutExerciseGroup, WorkoutSession } from "@/types";
@@ -19,7 +20,6 @@ import { Timestamp } from "firebase/firestore";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { workoutExerciseIssue, workoutFormSchema } from "@/lib/validation";
 
-const NOTIFICATION_ICON = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/xtrainer-user-icon-192.png`;
 // "renotify" existe na Notification API dos navegadores mas falta no lib.dom.d.ts do TypeScript.
 type ExtendedNotificationOptions = NotificationOptions & { renotify?: boolean };
 

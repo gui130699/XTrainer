@@ -117,6 +117,52 @@ service cloud.firestore {
         && (!('notes' in data) || data.notes is string);
     }
 
+    function validTherapy(data) {
+      return data.keys().hasAll(['ownerId', 'name', 'startDate', 'continuous', 'status', 'medications'])
+        && data.keys().hasOnly(['ownerId', 'name', 'startDate', 'endDate', 'continuous', 'status', 'medications', 'notes', 'reminderOffsetDays', 'createdAt', 'updatedAt'])
+        && data.ownerId is string
+        && data.name is string
+        && data.startDate is string
+        && data.continuous is bool
+        && data.status in ['active', 'paused', 'completed']
+        && data.medications is list
+        && data.medications.size() > 0
+        && (!('endDate' in data) || data.endDate is string)
+        && (!('notes' in data) || data.notes is string)
+        && (!('reminderOffsetDays' in data) || data.reminderOffsetDays is number);
+    }
+
+    function validTherapyAdministration(data) {
+      return data.keys().hasAll(['ownerId', 'therapyId', 'medicationId', 'scheduledDate', 'status'])
+        && data.keys().hasOnly(['ownerId', 'therapyId', 'medicationId', 'scheduledDate', 'actualDate', 'status', 'reportedAmount', 'reportedUnit', 'notes', 'createdAt', 'updatedAt'])
+        && data.ownerId is string
+        && data.therapyId is string
+        && data.medicationId is string
+        && data.scheduledDate is string
+        && data.status in ['completed', 'skipped', 'postponed']
+        && (!('actualDate' in data) || data.actualDate is string)
+        && (!('reportedAmount' in data) || data.reportedAmount is number)
+        && (!('reportedUnit' in data) || data.reportedUnit is string)
+        && (!('notes' in data) || data.notes is string);
+    }
+
+    function validSubstanceReference(data) {
+      return data.keys().hasAll(['name', 'description', 'riskTags', 'active', 'isSystem', 'sortOrder'])
+        && data.keys().hasOnly(['name', 'canonicalName', 'aliases', 'class', 'description', 'mechanismSummary', 'medicalUseSummary', 'riskTags', 'sources', 'active', 'isSystem', 'sortOrder', 'createdAt', 'updatedAt'])
+        && data.name is string
+        && data.description is string
+        && data.riskTags is list
+        && data.active is bool
+        && data.isSystem is bool
+        && data.sortOrder is number
+        && (!('canonicalName' in data) || data.canonicalName is string)
+        && (!('aliases' in data) || data.aliases is list)
+        && (!('class' in data) || data.class is string)
+        && (!('mechanismSummary' in data) || data.mechanismSummary is string)
+        && (!('medicalUseSummary' in data) || data.medicalUseSummary is string)
+        && (!('sources' in data) || data.sources is list);
+    }
+
     match /system/config {
       allow read: if true;
       // Provisionado somente pelo Console/Admin SDK. Não existe bootstrap público.
@@ -184,6 +230,26 @@ service cloud.firestore {
       allow create: if createsForSelf() && validAssessment(request.resource.data);
       allow update: if ownsExisting() && preservesOwner() && validAssessment(request.resource.data);
       allow delete: if ownsExisting();
+    }
+
+    match /therapies/{id} {
+      allow read: if ownsExisting();
+      allow create: if createsForSelf() && validTherapy(request.resource.data);
+      allow update: if ownsExisting() && preservesOwner() && validTherapy(request.resource.data);
+      allow delete: if ownsExisting();
+    }
+
+    match /therapyAdministrations/{id} {
+      allow read: if ownsExisting();
+      allow create: if createsForSelf() && validTherapyAdministration(request.resource.data);
+      allow update: if ownsExisting() && preservesOwner() && validTherapyAdministration(request.resource.data);
+      allow delete: if ownsExisting();
+    }
+
+    match /substanceReferences/{id} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && validSubstanceReference(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /auditLogs/{id} {

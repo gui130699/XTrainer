@@ -31,3 +31,40 @@ export function workoutExerciseIssue(item: { name: string; sets: number; repsMin
   const result = workoutExerciseSchema.safeParse(item);
   return result.success ? null : `${item.name}: ${result.error.issues[0]?.message ?? "revise os dados."}`;
 }
+
+export const medicationScheduleSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("interval"), intervalDays: z.number().int().min(1, "Informe um intervalo de pelo menos 1 dia.") }),
+  z.object({ type: z.literal("weekdays"), weekdays: z.array(z.number().int().min(0).max(6)).min(1, "Selecione ao menos um dia da semana.").refine((days) => new Set(days).size === days.length, "Não repita o mesmo dia da semana.") }),
+  z.object({ type: z.literal("custom"), dates: z.array(z.string().min(1)).min(1, "Informe ao menos uma data.").refine((dates) => new Set(dates).size === dates.length, "Não repita a mesma data.") }),
+]);
+
+export const therapyMedicationSchema = z.object({
+  name: z.string().trim().min(1, "Informe o nome do medicamento."),
+  formulation: z.string().trim().optional(),
+  schedule: medicationScheduleSchema,
+  reportedAmount: z.number().positive("A quantidade deve ser maior que zero.").optional(),
+  reportedUnit: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
+});
+
+export const therapySchema = z
+  .object({
+    name: z.string().trim().min(1, "Informe o nome da terapia."),
+    startDate: z.string().min(1, "Informe a data de início."),
+    endDate: z.string().optional(),
+    continuous: z.boolean(),
+    medications: z.array(therapyMedicationSchema).min(1, "Adicione ao menos um medicamento."),
+    notes: z.string().trim().optional(),
+  })
+  .refine((data) => data.continuous || Boolean(data.endDate), { message: "Informe a data final ou marque como contínua.", path: ["endDate"] })
+  .refine((data) => !data.continuous || !data.endDate, { message: "Terapia contínua não deve ter data final.", path: ["endDate"] })
+  .refine((data) => !data.endDate || data.endDate >= data.startDate, { message: "A data final deve ser igual ou posterior à data de início.", path: ["endDate"] });
+
+export const therapyAdministrationSchema = z.object({
+  scheduledDate: z.string().min(1),
+  actualDate: z.string().optional(),
+  status: z.enum(["completed", "skipped", "postponed"]),
+  reportedAmount: z.number().positive("A quantidade deve ser maior que zero.").optional(),
+  reportedUnit: z.string().trim().optional(),
+  notes: z.string().trim().optional(),
+});

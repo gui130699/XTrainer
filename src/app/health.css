@@ -1,0 +1,25 @@
+.status-pill{display:inline-block;font-size:11px;font-weight:bold;letter-spacing:.5px;padding:4px 10px;border-radius:999px;background:#18283a;color:#8fa3b8;text-transform:uppercase;margin-bottom:8px}
+.status-active,.status-completed{background:#0f2e22;color:#86efac}
+.status-paused,.status-postponed{background:#3a2f0f;color:#fde68a}
+.status-skipped{background:#3a1a1a;color:#fca5a5}
+
+.therapy-medications{margin:14px 0}
+.therapy-medications-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.therapy-medication-item{margin-bottom:14px}
+
+.schedule-editor{display:flex;flex-direction:column;gap:10px;margin:12px 0}
+.schedule-editor input[type="number"]{width:90px}
+.weekday-picker{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:10px}
+.weekday-picker legend{font-size:12px;color:#8fa3b8;margin-bottom:6px}
+.custom-dates{display:flex;flex-direction:column;gap:8px}
+.custom-dates-list{display:flex;flex-wrap:wrap;gap:8px}
+.custom-date-chip{display:inline-flex;align-items:center;gap:6px;background:#18283a;border:1px solid #344b63;border-radius:999px;padding:4px 10px;font-size:13px}
+.custom-date-chip button{border:0;background:transparent;color:#8fa3b8;display:grid;place-items:center}
+
+.ics-picker{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:13px;color:#8fa3b8}
+
+.substance-row{display:flex;align-items:center;gap:10px;justify-content:flex-start}
+.substance-select{flex:1;text-align:left;background:transparent;border:0;color:inherit;display:flex;flex-direction:column;gap:3px;padding:6px 0}
+.substance-select.active strong{color:#22d3ee}
+.risk-tag-list{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.risk-tag-chip{background:#18283a;border:1px solid #344b63;border-radius:999px;padding:5px 12px;font-size:12px;color:#a5f3fc}

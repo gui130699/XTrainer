@@ -12,6 +12,9 @@ let userB;
 const profile = (uid, role = "user") => ({ uid, name: uid, email: `${uid}@test.dev`, role });
 const workout = (ownerId) => ({ ownerId, name: "Treino A", title: "Treino A", muscleGroups: ["Peito"], exercises: [], active: true });
 const session = (ownerId, status = "active") => ({ ownerId, workoutId: "work-a", workoutName: "Treino A", exercises: [], totalVolume: 0, totalSets: 0, status });
+const therapy = (ownerId) => ({ ownerId, name: "Terapia A", startDate: "2026-08-01", continuous: true, status: "active", medications: [{ id: "med-1", name: "Medicamento A", schedule: { type: "interval", intervalDays: 7 } }] });
+const administration = (ownerId) => ({ ownerId, therapyId: "therapy-a", medicationId: "med-1", scheduledDate: "2026-08-01", status: "completed" });
+const substanceReference = () => ({ name: "Substância A", description: "Descrição educativa.", riskTags: ["hepatic"], active: true, isSystem: false, sortOrder: 1 });
 
 before(async () => {
   environment = await initializeTestEnvironment({ projectId: "xtrainer-45f8d", firestore: { rules: readFileSync("firestore.rules", "utf8") } });
@@ -28,6 +31,9 @@ before(async () => {
     await setDoc(doc(database, "workoutSessions", "history-a"), session("user-a", "completed"));
     await setDoc(doc(database, "bodyWeights", "weight-a"), { ownerId: "user-a", date: "2026-08-17", weight: 80 });
     await setDoc(doc(database, "physicalAssessments", "assessment-a"), { ownerId: "user-a", date: "2026-08-17", type: "quick", measurements: {} });
+    await setDoc(doc(database, "therapies", "therapy-a"), therapy("user-a"));
+    await setDoc(doc(database, "therapyAdministrations", "administration-a"), administration("user-a"));
+    await setDoc(doc(database, "substanceReferences", "substance-a"), substanceReference());
   });
   anonymous = environment.unauthenticatedContext().firestore();
   admin = environment.authenticatedContext("admin").firestore();
@@ -53,7 +59,7 @@ test("cadastro comum não consegue promover a si mesmo a administrador", async (
 test("usuário vê somente o próprio perfil e dados corporais", async () => {
   await assertSucceeds(getDoc(doc(userA, "users", "user-a")));
   await assertFails(getDoc(doc(userA, "users", "user-b")));
-  for (const path of ["workouts/work-a", "workoutSessions/history-a", "bodyWeights/weight-a", "physicalAssessments/assessment-a"]) {
+  for (const path of ["workouts/work-a", "workoutSessions/history-a", "bodyWeights/weight-a", "physicalAssessments/assessment-a", "therapies/therapy-a", "therapyAdministrations/administration-a"]) {
     await assertSucceeds(getDoc(doc(userA, path)));
     await assertFails(getDoc(doc(userB, path)));
   }
@@ -115,10 +121,29 @@ test("avaliação parcial pode ser criada, editada e excluída pelo dono", async
 
 test("administrador gerencia catálogo e auditoria, mas não acessa dados pessoais", async () => {
   await assertSucceeds(getDocs(collection(admin, "users")));
-  for (const name of ["workouts", "workoutSessions", "bodyWeights", "physicalAssessments"]) await assertFails(getDocs(collection(admin, name)));
+  for (const name of ["workouts", "workoutSessions", "bodyWeights", "physicalAssessments", "therapies", "therapyAdministrations"]) await assertFails(getDocs(collection(admin, name)));
   await assertFails(getDoc(doc(admin, "physicalAssessments", "assessment-a")));
+  await assertFails(getDoc(doc(admin, "therapies", "therapy-a")));
+  await assertFails(getDoc(doc(admin, "therapyAdministrations", "administration-a")));
   await assertSucceeds(setDoc(doc(admin, "auditLogs", "log-1"), { adminUid: "admin", action: "exercise.update", entityType: "exercise", entityId: "supino", summary: "Teste", timestamp: Timestamp.now() }));
   await assertFails(updateDoc(doc(admin, "auditLogs", "log-1"), { summary: "Alterado" }));
+});
+
+test("terapias e registros de aplicação pertencem exclusivamente ao dono", async () => {
+  await assertSucceeds(setDoc(doc(userA, "therapies", "new-therapy"), therapy("user-a")));
+  await assertFails(setDoc(doc(userA, "therapies", "new-therapy-b"), therapy("user-b")));
+  await assertFails(updateDoc(doc(userA, "therapies", "therapy-a"), { ownerId: "user-b" }));
+  await assertFails(setDoc(doc(userA, "therapies", "no-medications"), { ...therapy("user-a"), medications: [] }));
+  await assertSucceeds(setDoc(doc(userA, "therapyAdministrations", "new-administration"), administration("user-a")));
+  await assertFails(setDoc(doc(userA, "therapyAdministrations", "new-administration-b"), administration("user-b")));
+  await assertFails(setDoc(doc(userA, "therapyAdministrations", "bad-status"), { ...administration("user-a"), status: "pending" }));
+});
+
+test("referência de substâncias é legível por autenticados e gravável somente pelo admin", async () => {
+  await assertSucceeds(getDoc(doc(userA, "substanceReferences", "substance-a")));
+  await assertFails(getDoc(doc(anonymous, "substanceReferences", "substance-a")));
+  await assertFails(updateDoc(doc(userA, "substanceReferences", "substance-a"), { active: false }));
+  await assertSucceeds(updateDoc(doc(admin, "substanceReferences", "substance-a"), { active: false }));
 });
 
 test("coleções não declaradas permanecem fechadas", async () => {
