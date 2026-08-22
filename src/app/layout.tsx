@@ -4,7 +4,6 @@ import "./assessment.css";
 import "./training-methods.css";
 import "./workout-plans.css";
 import "./workout-builder.css";
-import "./health.css";
 import { Providers } from "@/components/providers";
 import { InstallAppButton } from "@/components/install-app-button";
 const basePath = process.env.GITHUB_ACTIONS === "true" ? "/XTrainer" : "";
