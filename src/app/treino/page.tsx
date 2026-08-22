@@ -14,9 +14,20 @@ import { dataErrorMessage, exerciseMuscleGroups, normalizeSearchText } from "@/l
 import { exercises, sessions, workouts } from "@/services/data";
 import { trainingMethodsService } from "@/services/training-methods";
 import type { Exercise, SyncStatus, TrainingMethod, TrainingSet, Workout, WorkoutExercise, WorkoutExerciseGroup, WorkoutSession } from "@/types";
-import { Archive, Check, ChevronDown, Copy, ExternalLink, History, Pencil, Play, Plus, Search, Timer } from "lucide-react";
+import { Archive, Bell, Check, ChevronDown, Copy, ExternalLink, History, Pencil, Play, Plus, Search, Timer } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+const NOTIFICATION_ICON = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/xtrainer-user-icon-192.png`;
+
+async function closeRestNotification() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const items = await registration.getNotifications({ tag: "xtrainer-rest" });
+    items.forEach((item) => item.close());
+  } catch { /* notificações indisponíveis neste navegador */ }
+}
 
 const newExercise = (exercise: Exercise, order: number, method = normalTrainingMethod()): WorkoutExercise => ({ id: crypto.randomUUID(), exerciseId: exercise.id, name: exercise.name, order, sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, methodSnapshot: snapshotMethod(method), methodConfig: createMethodConfig(method) });
 const reorder = (items: WorkoutExercise[]) => items.map((item, index) => ({ ...item, order: index + 1 }));
@@ -59,6 +70,8 @@ function Work() {
   const [clock, setClock] = useState(() => Date.now());
   const [summary, setSummary] = useState<TrainingSummary | null>(null);
   const [completedCounts, setCompletedCounts] = useState<Map<string, number>>(new Map());
+  const [notifyPermission, setNotifyPermission] = useState<NotificationPermission | "unsupported">(() => (typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported"));
+  const prevRestSecondsRef = useRef(0);
 
   const load = useCallback(async () => {
     if (!uid) return;
@@ -112,6 +125,21 @@ function Work() {
   const activePlans = plans.filter((item) => item.active);
   const archivedPlans = plans.filter((item) => !item.active);
   const restSeconds = session?.restEndsAt ? Math.max(0, Math.ceil((session.restEndsAt.toMillis() - clock) / 1000)) : 0;
+  useEffect(() => {
+    const previous = prevRestSecondsRef.current;
+    prevRestSecondsRef.current = restSeconds;
+    if (notifyPermission !== "granted" || !("serviceWorker" in navigator)) return;
+    void navigator.serviceWorker.ready.then((registration) => {
+      if (restSeconds > 0) {
+        const minutes = String(Math.floor(restSeconds / 60)).padStart(2, "0");
+        const secondsLabel = String(restSeconds % 60).padStart(2, "0");
+        return registration.showNotification("Descanso em andamento", { body: `⏱️ ${minutes}:${secondsLabel} restantes`, tag: "xtrainer-rest", silent: true, icon: NOTIFICATION_ICON, badge: NOTIFICATION_ICON });
+      }
+      if (previous > 0 && session) {
+        return registration.showNotification("Descanso finalizado!", { body: "Hora da próxima série 💪", tag: "xtrainer-rest", renotify: true, icon: NOTIFICATION_ICON, badge: NOTIFICATION_ICON });
+      }
+    }).catch(() => undefined);
+  }, [restSeconds, notifyPermission, session]);
 
   if (!uid) return <Loading />;
 
@@ -268,6 +296,12 @@ function Work() {
     }
   }
 
+  async function enableNotifications() {
+    if (!("Notification" in window)) return;
+    const result = await Notification.requestPermission();
+    setNotifyPermission(result);
+  }
+
   async function start(workout: Workout) {
     setMessage("");
     try {
@@ -360,6 +394,7 @@ function Work() {
       setSession(null);
       setActive(null);
       setSyncStatus("idle");
+      void closeRestNotification();
     } catch (error) {
       setMessage(dataErrorMessage(error, "Não foi possível finalizar o treino."));
     } finally {
@@ -374,6 +409,7 @@ function Work() {
       setSession(null);
       setActive(null);
       setSyncStatus("idle");
+      void closeRestNotification();
     } catch (error) {
       setMessage(dataErrorMessage(error, "Não foi possível cancelar a sessão."));
     } finally {
@@ -383,7 +419,7 @@ function Work() {
 
   if (summary) return <AppShell><header><p className="eyebrow">TREINO CONCLUÍDO</p><h1>{summary.session.workoutName}</h1><p>Seu desempenho foi salvo no histórico.</p></header><div className="stat-grid"><Card><span>Duração</span><strong>{Math.round((summary.session.durationSeconds ?? 0) / 60)} min</strong></Card><Card><span>Volume</span><strong>{Math.round(summary.session.totalVolume).toLocaleString("pt-BR")} kg</strong></Card><Card><span>Séries</span><strong>{summary.session.totalSets}</strong></Card><Card><span>Exercícios</span><strong>{summary.session.exercises.length}</strong></Card></div><Card><h2>Recordes alcançados</h2>{summary.records.length ? summary.records.map((record, index) => <div className="row" key={`${record.exerciseId}-${record.kind}-${index}`}><strong>{record.name}</strong><span>{record.kind === "load" ? `${record.value.toLocaleString("pt-BR")} kg` : record.kind === "reps" ? `${record.value} repetições` : `${Math.round(record.value).toLocaleString("pt-BR")} kg de volume`}</span></div>) : <Empty title="Nenhum recorde novo nesta sessão" detail="Continue treinando para acompanhar sua progressão automática."/>}{summary.analyticsWarning && <p className="error">{summary.analyticsWarning}</p>}</Card><Button onClick={() => setSummary(null)}>VOLTAR AOS TREINOS</Button></AppShell>;
 
-  if (session) return <AppShell><header><p className="eyebrow">EM ANDAMENTO</p><h1>{session.workoutName}</h1><p>{session.totalSets} séries concluídas · {Math.round(session.totalVolume).toLocaleString("pt-BR")} kg</p><p className={`sync-status ${syncStatus}`} role="status">{syncStatus === "saving" ? "Salvando..." : syncStatus === "saved" ? "Salvo" : syncStatus === "offline" ? "Salvo neste dispositivo. Aguardando sincronização." : syncStatus === "error" ? "Erro ao sincronizar. Use Tentar novamente." : "Alterações locais"}{syncStatus === "error" && <button className="text-button" onClick={() => void syncSession(session)}>Tentar novamente</button>}</p></header>
+  if (session) return <AppShell><header><p className="eyebrow">EM ANDAMENTO</p><h1>{session.workoutName}</h1><p>{session.totalSets} séries concluídas · {Math.round(session.totalVolume).toLocaleString("pt-BR")} kg</p><p className={`sync-status ${syncStatus}`} role="status">{syncStatus === "saving" ? "Salvando..." : syncStatus === "saved" ? "Salvo" : syncStatus === "offline" ? "Salvo neste dispositivo. Aguardando sincronização." : syncStatus === "error" ? "Erro ao sincronizar. Use Tentar novamente." : "Alterações locais"}{syncStatus === "error" && <button className="text-button" onClick={() => void syncSession(session)}>Tentar novamente</button>}</p>{notifyPermission === "default" && <button type="button" className="text-button" onClick={() => void enableNotifications()}><Bell size={15}/> Ativar notificações do cronômetro de descanso</button>}{notifyPermission === "denied" && <p className="error">Notificações bloqueadas pelo navegador. Ative nas configurações do site para ver o cronômetro de descanso nas notificações.</p>}</header>
     {restSeconds > 0 && <Card className="rest"><Timer/><strong>{String(Math.floor(restSeconds / 60)).padStart(2, "0")}:{String(restSeconds % 60).padStart(2, "0")}</strong><Button onClick={() => void syncSession({ ...session, restEndsAt: undefined })}>PULAR DESCANSO</Button><button className="text-button" onClick={() => void syncSession({ ...session, restEndsAt: Timestamp.fromMillis((session.restEndsAt?.toMillis() ?? Date.now()) + 15000) })}>+15s</button></Card>}
     {session.exercises.map((exercise, exerciseIndex) => { if (exercise.target.groupId) { const group = session.exerciseGroups?.find((item) => item.id === exercise.target.groupId); if (!group || group.exerciseIds[0] !== exercise.id) return null; const members = group.exerciseIds.map((id) => session.exercises.find((item) => item.id === id)).filter((item): item is typeof exercise => Boolean(item)); return <TrainingGroupExecution key={group.id} group={group} members={members} allExercises={session.exercises} library={library} onChange={changeSet} onComplete={(item, set, completed) => void completeSet(item, set, completed)} onSwap={swapExercise} onSync={() => session && void syncSession(session)}/>; } return <TrainingMethodExecution key={exercise.id} exercise={exercise} exerciseIndex={exerciseIndex} library={library} onChange={changeSet} onComplete={(item, set, completed) => void completeSet(item, set, completed)} onAdd={(item) => void addSet(item)} onRemove={(item, set) => void removeSet(item, set)} onSwap={swapExercise} onSync={() => session && void syncSession(session)}/>; })}
     {message && <p className="error" role="alert">{message}</p>}<Button className="finish" onClick={() => void finish()} disabled={saving}>{saving ? "FINALIZANDO..." : "FINALIZAR TREINO"}</Button><button className="text-button" onClick={() => void cancel(session)} disabled={saving}>Cancelar treino</button>
