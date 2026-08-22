@@ -7,6 +7,7 @@ import {
   getDoc,
   getDocs,
   limit,
+  onSnapshot,
   orderBy,
   query,
   runTransaction,
@@ -17,9 +18,9 @@ import {
   writeBatch,
   type DocumentData,
   type QueryDocumentSnapshot,
+  type Unsubscribe,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { DEFAULT_EXERCISES } from "@/data/default-exercises";
 import { normalizeSearchText } from "@/lib/utils";
 import { createTrainingSets, normalizeWorkoutMethod } from "@/lib/training-methods";
@@ -31,7 +32,6 @@ import {
   normalizeWorkoutSessionDocument,
 } from "@/lib/compatibility";
 import type {
-  AssessmentPhotoView,
   BodyWeight,
   Exercise,
   PhysicalAssessment,
@@ -196,7 +196,6 @@ const assessmentPayload = (data: AssessmentInput) => withoutUndefined({
   skinfolds: data.skinfolds ? withoutUndefined(data.skinfolds) : undefined,
   assessmentProtocol: data.assessmentProtocol,
   notes: data.notes,
-  photos: data.photos,
 });
 
 export const assessments = {
@@ -218,14 +217,6 @@ export const assessments = {
     return created.id;
   },
   remove: (id: string) => deleteDoc(doc(db, "physicalAssessments", id)),
-  uploadPhoto: async (uid: string, assessmentId: string, view: AssessmentPhotoView, file: File) => {
-    if (!file.type.startsWith("image/")) throw new Error("Selecione um arquivo de imagem.");
-    if (file.size >= 8 * 1024 * 1024) throw new Error("A imagem deve ter menos de 8 MB.");
-    const extension = file.name.split(".").pop()?.replace(/[^a-z0-9]/gi, "").toLowerCase() || "jpg";
-    const target = ref(storage, `users/${uid}/assessments/${assessmentId}/${view}-${Date.now()}.${extension}`);
-    await uploadBytes(target, file, { contentType: file.type });
-    return getDownloadURL(target);
-  },
 };
 
 export interface SessionPage {
@@ -394,4 +385,16 @@ export const sessions = {
     });
     return historyRef.id;
   },
+  // Observa apenas os metadados do documento da sessão ativa: hasPendingWrites indica se as
+  // alterações registradas neste dispositivo (série marcada, descanso ajustado, etc.) já foram
+  // confirmadas pelo servidor ou ainda estão só no cache local aguardando conexão. O cache
+  // persistente do Firestore (ver src/lib/firebase.ts) garante que essas escritas sobrevivem a
+  // fechar o app e são reenviadas automaticamente assim que a internet voltar.
+  watchSyncState: (id: string, callback: (hasPendingWrites: boolean) => void): Unsubscribe =>
+    onSnapshot(
+      doc(db, "workoutSessions", id),
+      { includeMetadataChanges: true },
+      (snapshot) => callback(snapshot.metadata.hasPendingWrites),
+      () => callback(false),
+    ),
 };

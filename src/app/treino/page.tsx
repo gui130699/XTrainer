@@ -67,7 +67,9 @@ function Work() {
   const [message, setMessage] = useState("");
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [active, setActive] = useState<WorkoutSession | null>(null);
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+  const [hasPendingWrites, setHasPendingWrites] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [clock, setClock] = useState(() => Date.now());
@@ -143,6 +145,29 @@ function Work() {
       }
     }).catch(() => undefined);
   }, [restSeconds, notifyPermission, session]);
+
+  // O navegador só nos avisa quando a interface de rede muda de estado; isso já cobre o caso
+  // clássico de academia (wifi cai, some o sinal) sem depender de tentar uma escrita para descobrir.
+  useEffect(() => {
+    function goOnline() { setIsOnline(true); }
+    function goOffline() { setIsOnline(false); }
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
+
+  // Acompanha se as últimas alterações da sessão ativa (séries marcadas, descanso ajustado etc.)
+  // já foram confirmadas pelo servidor. Enquanto offline, elas continuam salvas no cache
+  // persistente do Firestore neste aparelho e são reenviadas sozinhas assim que a conexão volta.
+  useEffect(() => {
+    if (!session?.id) return;
+    return sessions.watchSyncState(session.id, setHasPendingWrites);
+  }, [session?.id]);
+
+  const syncStatus: SyncStatus = saveError ? "error" : !isOnline ? "offline" : hasPendingWrites ? "saving" : "saved";
 
   if (!uid) return <Loading />;
 
@@ -310,11 +335,11 @@ function Work() {
 
   async function start(workout: Workout) {
     setMessage("");
+    setSaveError(false);
     try {
       const created = await sessions.start(uid!, workout);
       setSession(created);
       setActive(created);
-      setSyncStatus(navigator.onLine ? "saved" : "offline");
     } catch (error) {
       const current = await sessions.getActive(uid!).catch(() => null);
       if (current) setActive(current);
@@ -327,24 +352,20 @@ function Work() {
     const value = { ...next, ...totals };
     setSession(value);
     setActive(value);
-    setSyncStatus("idle");
     return value;
   }
 
   async function syncSession(next: WorkoutSession) {
     const value = localSession(next);
-    setSyncStatus("saving");
     try {
-      const pendingWrite = sessions.save(value.id, { exercises: value.exercises, totalSets: value.totalSets, totalVolume: value.totalVolume, restEndsAt: value.restEndsAt, notes: value.notes });
-      if (!navigator.onLine) {
-        setSyncStatus("offline");
-        void pendingWrite.then(() => setSyncStatus("saved")).catch(() => setSyncStatus("error"));
-        return;
-      }
-      await pendingWrite;
-      setSyncStatus("saved");
+      // Com o cache persistente do Firestore, esta escrita fica registrada no aparelho
+      // imediatamente; se estiver offline, a promise só resolve quando a conexão voltar e o
+      // servidor confirmar — por isso o indicador de status (syncStatus) não depende dela, e sim
+      // do listener de hasPendingWrites acima, que reflete o estado real do cache local.
+      await sessions.save(value.id, { exercises: value.exercises, totalSets: value.totalSets, totalVolume: value.totalVolume, restEndsAt: value.restEndsAt, notes: value.notes });
+      setSaveError(false);
     } catch {
-      setSyncStatus("error");
+      setSaveError(true);
     }
   }
 
@@ -399,7 +420,7 @@ function Work() {
       setSummary({ session: completed, records, analyticsWarning });
       setSession(null);
       setActive(null);
-      setSyncStatus("idle");
+      setSaveError(false);
       void closeRestNotification();
     } catch (error) {
       setMessage(dataErrorMessage(error, "Não foi possível finalizar o treino."));
@@ -414,7 +435,7 @@ function Work() {
       await sessions.cancel(target);
       setSession(null);
       setActive(null);
-      setSyncStatus("idle");
+      setSaveError(false);
       void closeRestNotification();
     } catch (error) {
       setMessage(dataErrorMessage(error, "Não foi possível cancelar a sessão."));

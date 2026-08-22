@@ -10,7 +10,7 @@ import { compareAssessments } from "@/lib/body-assessments";
 import { calculateEvolution, calculateExerciseHistory, calculateExerciseRecords, calculateMonthlyStats } from "@/lib/training-analytics";
 import { dataErrorMessage, exerciseMuscleGroups, formatDateBR, normalizeSearchText, parseBrazilianNumber } from "@/lib/utils";
 import { assessments, exercises, sessions, weights, type SessionPage } from "@/services/data";
-import type { AssessmentPhotoView, AssessmentType, BodyWeight, Exercise, PhysicalAssessment, WorkoutSession } from "@/types";
+import type { AssessmentType, BodyWeight, Exercise, PhysicalAssessment, WorkoutSession } from "@/types";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -123,25 +123,18 @@ function Evolution() {
     }
   }
 
-  async function saveAssessment(value: AssessmentFormValue, files: Partial<Record<AssessmentPhotoView, File>>, alsoWeight: boolean) {
+  async function saveAssessment(value: AssessmentFormValue, alsoWeight: boolean) {
     setSaving(true);
     setError("");
     setMessage("");
     try {
-      const base = { ownerId: uid!, ...value, photos: editingAssessment?.photos };
+      const base = { ownerId: uid!, ...value };
       const assessmentId = await assessments.save(base, editingAssessment?.id);
-      const photos = { ...(editingAssessment?.photos ?? {}) };
-      const uploadWarnings: string[] = [];
-      for (const [view, file] of Object.entries(files) as [AssessmentPhotoView, File][]) {
-        try { photos[view] = await assessments.uploadPhoto(uid!, assessmentId, view, file); }
-        catch { uploadWarnings.push(view); }
-      }
-      if (Object.keys(photos).length) await assessments.save({ ...base, photos }, assessmentId);
       if (alsoWeight && value.weight && !body.some((item) => item.assessmentId === assessmentId)) await weights.save({ ownerId: uid!, date: value.date, weight: value.weight, source: "assessment", assessmentId, note: "Registrado a partir de avaliação física" });
       await reloadBodyData();
       setAssessmentFormOpen(false);
       setEditingAssessment(null);
-      setMessage(uploadWarnings.length ? `Avaliação salva. Fotos não enviadas: ${uploadWarnings.join(", ")}.` : "Avaliação salva com sucesso.");
+      setMessage("Avaliação salva com sucesso.");
     } catch (reason) {
       setError(dataErrorMessage(reason, "Não foi possível salvar a avaliação."));
     } finally {

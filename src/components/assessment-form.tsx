@@ -12,7 +12,7 @@ import {
   type SkinfoldProtocol,
 } from "@/lib/body-assessments";
 import { parseBrazilianNumber } from "@/lib/utils";
-import type { AssessmentPhotoView, AssessmentType, BodyMeasurements, PhysicalAssessment, Skinfolds } from "@/types";
+import type { AssessmentType, BodyMeasurements, PhysicalAssessment, Skinfolds } from "@/types";
 import { Save, X } from "lucide-react";
 import { useState } from "react";
 
@@ -72,7 +72,7 @@ export function AssessmentForm({ mode, initial, saving, profileBirthDate, profil
   profileBirthDate?: string;
   profileHeight?: number;
   profileSex?: string;
-  onSave: (value: AssessmentFormValue, files: Partial<Record<AssessmentPhotoView, File>>, alsoWeight: boolean) => Promise<void>;
+  onSave: (value: AssessmentFormValue, alsoWeight: boolean) => Promise<void>;
   onCancel: () => void;
 }) {
   const parsedProtocol = parseAssessmentProtocol(initial?.assessmentProtocol);
@@ -117,11 +117,6 @@ export function AssessmentForm({ mode, initial, saving, profileBirthDate, profil
         if (value !== undefined) measurements[key] = value;
       }
       const skinfolds = mode === "advanced" ? readSkinfolds(form) : undefined;
-      const files: Partial<Record<AssessmentPhotoView, File>> = {};
-      for (const view of ["front", "side", "back"] as AssessmentPhotoView[]) {
-        const file = form.get(`photo.${view}`);
-        if (file instanceof File && file.size) files[view] = file;
-      }
 
       const composition = mode === "advanced" ? calculateFromForm(form) : null;
       if (mode === "advanced" && !composition) throw new Error("Informe peso, idade, sexo biológico, protocolo e todas as dobras obrigatórias.");
@@ -140,7 +135,7 @@ export function AssessmentForm({ mode, initial, saving, profileBirthDate, profil
         skinfolds: skinfolds && Object.keys(skinfolds).length ? skinfolds : undefined,
         assessmentProtocol: composition && sex && age !== undefined ? formatAssessmentProtocol(composition.protocol, sex, age) : undefined,
         notes: String(form.get("notes") ?? "").trim() || undefined,
-      }, files, form.get("alsoWeight") === "on");
+      }, form.get("alsoWeight") === "on");
     } catch (reason) {
       setFormError(reason instanceof Error ? reason.message : "Confira os dados da avaliação.");
     }
@@ -169,7 +164,6 @@ export function AssessmentForm({ mode, initial, saving, profileBirthDate, profil
     {mode === "advanced" && <>
       <details open><summary>Dobras cutâneas para o cálculo</summary><p className="muted">Meça com adipômetro e informe em milímetros. Os campos marcados com * são exigidos pelo protocolo selecionado.</p><div className="form-grid">{skinfoldFields.map(([key, label]) => <label key={key}>{label}{requiredSites.has(key) ? " *" : ""} (mm)<input required={requiredSites.has(key)} name={`skinfold.${key}`} inputMode="decimal" min="0.1" max="100" step="0.1" defaultValue={initial?.skinfolds?.[key]}/></label>)}</div></details>
       <section className="composition-result" aria-live="polite"><div><span>Gordura corporal</span><strong>{calculation ? `${calculation.bodyFat.toLocaleString("pt-BR")}%` : "—"}</strong></div><div><span>Massa gorda</span><strong>{calculation ? `${calculation.fatMass.toLocaleString("pt-BR")} kg` : "—"}</strong></div><div><span>Massa magra</span><strong>{calculation ? `${calculation.leanMass.toLocaleString("pt-BR")} kg` : "—"}</strong></div><p>{calculation ? `Calculado pela soma de ${calculation.skinfoldSum.toLocaleString("pt-BR")} mm, densidade corporal ${calculation.bodyDensity.toLocaleString("pt-BR")} e equação de Siri.` : "Preencha os dados obrigatórios para calcular automaticamente."}</p></section>
-      <details><summary>Fotos</summary><p className="muted">As fotos são opcionais e privadas.</p><div className="form-grid"><label>Foto de frente<input name="photo.front" type="file" accept="image/*"/></label><label>Foto lateral<input name="photo.side" type="file" accept="image/*"/></label><label>Foto de costas<input name="photo.back" type="file" accept="image/*"/></label></div></details>
     </>}
 
     <details open><summary>Observações</summary><label>Observações<textarea name="notes" defaultValue={initial?.notes}/></label></details>

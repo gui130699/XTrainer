@@ -4,7 +4,6 @@ export type Id = string;
 export type SyncStatus = "idle" | "saving" | "saved" | "error" | "offline";
 export type AssessmentType = "quick" | "complete" | "advanced";
 export type BodyWeightSource = "manual" | "assessment";
-export type AssessmentPhotoView = "front" | "side" | "back";
 
 export interface UserProfile {
   uid: Id;
@@ -15,7 +14,6 @@ export interface UserProfile {
   height?: number;
   sex?: string;
   goal?: string;
-  photoURL?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -272,7 +270,6 @@ export interface PhysicalAssessment {
   skinfolds?: Skinfolds;
   assessmentProtocol?: string;
   notes?: string;
-  photos?: Partial<Record<AssessmentPhotoView, string>>;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

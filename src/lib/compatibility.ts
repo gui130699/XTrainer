@@ -117,6 +117,5 @@ export function normalizeAssessmentDocument(id: string, raw: LegacyDocument): Ph
     type,
     measurements,
     skinfolds: raw.skinfolds && typeof raw.skinfolds === "object" ? object(raw.skinfolds) : undefined,
-    photos: raw.photos && typeof raw.photos === "object" ? object(raw.photos) : undefined,
   } as PhysicalAssessment;
 }
