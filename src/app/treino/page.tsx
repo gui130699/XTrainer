@@ -17,8 +17,11 @@ import type { Exercise, SyncStatus, TrainingMethod, TrainingSet, Workout, Workou
 import { Archive, Bell, Check, ChevronDown, Copy, ExternalLink, History, Pencil, Play, Plus, Search, Timer } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { workoutExerciseIssue, workoutFormSchema } from "@/lib/validation";
 
 const NOTIFICATION_ICON = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/xtrainer-user-icon-192.png`;
+// "renotify" existe na Notification API dos navegadores mas falta no lib.dom.d.ts do TypeScript.
+type ExtendedNotificationOptions = NotificationOptions & { renotify?: boolean };
 
 async function closeRestNotification() {
   if (!("serviceWorker" in navigator)) return;
@@ -136,7 +139,7 @@ function Work() {
         return registration.showNotification("Descanso em andamento", { body: `⏱️ ${minutes}:${secondsLabel} restantes`, tag: "xtrainer-rest", silent: true, icon: NOTIFICATION_ICON, badge: NOTIFICATION_ICON });
       }
       if (previous > 0 && session) {
-        return registration.showNotification("Descanso finalizado!", { body: "Hora da próxima série 💪", tag: "xtrainer-rest", renotify: true, icon: NOTIFICATION_ICON, badge: NOTIFICATION_ICON });
+        return registration.showNotification("Descanso finalizado!", { body: "Hora da próxima série 💪", tag: "xtrainer-rest", renotify: true, icon: NOTIFICATION_ICON, badge: NOTIFICATION_ICON } as ExtendedNotificationOptions);
       }
     }).catch(() => undefined);
   }, [restSeconds, notifyPermission, session]);
@@ -182,8 +185,9 @@ function Work() {
   }
 
   function finishDraftExercise(item: WorkoutExercise) {
-    if (!Number.isInteger(item.sets) || item.sets < 1 || !Number.isInteger(item.repsMin) || item.repsMin < 1 || !Number.isInteger(item.repsMax) || item.repsMax < item.repsMin || !Number.isFinite(item.restSeconds) || item.restSeconds < 0) {
-      setMessage(`Revise séries, repetições e descanso de ${item.name}.`);
+    const issue = workoutExerciseIssue(item);
+    if (issue) {
+      setMessage(issue);
       return;
     }
     setMessage("");
@@ -258,8 +262,10 @@ function Work() {
 
   async function saveWorkout(event: React.FormEvent) {
     event.preventDefault();
-    if (!name.trim() || !title.trim() || !draft.length) return setMessage("Informe nome, título e adicione ao menos um exercício.");
-    if (draft.some((item) => !Number.isInteger(item.sets) || item.sets < 1 || !Number.isInteger(item.repsMin) || item.repsMin < 1 || !Number.isInteger(item.repsMax) || item.repsMax < item.repsMin || !Number.isFinite(item.restSeconds) || item.restSeconds < 0)) return setMessage("Revise séries, repetições e descanso.");
+    const formResult = workoutFormSchema.safeParse({ name, title, exercises: draft });
+    if (!formResult.success) return setMessage(formResult.error.issues[0]?.message ?? "Revise os dados do treino.");
+    const exerciseIssue = draft.map(workoutExerciseIssue).find(Boolean);
+    if (exerciseIssue) return setMessage(exerciseIssue);
     for (const item of draftGroups) if (item.exerciseIds.length < item.methodSnapshot.exerciseRules.minExercises || item.exerciseIds.length > item.methodSnapshot.exerciseRules.maxExercises) return setMessage(`Revise o grupo ${item.name}.`);
     setSaving(true);
     setMessage("");

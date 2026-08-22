@@ -5,7 +5,7 @@ export const exerciseMuscleGroups = ["Peito","Dorsais","Costas","Trapézio","Omb
 export const normalizeSearchText = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/\s+/g, " ");
 export const slugifyExerciseName = (name: string) => normalizeSearchText(name).replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 export const parseBrazilianNumber = (value: string) => Number(value.trim().replace(",", "."));
-export const formatDateBR = (value: string) => { const [year, month, day] = value.split("-"); return year && month && day ? `${day}/${month}/${year}` : value; };
+export const formatDateBR = (value: string) => { const [year, month, day] = value.split("-"); return /^\d{4}$/.test(year ?? "") && /^\d{1,2}$/.test(month ?? "") && /^\d{1,2}$/.test(day ?? "") ? `${day.padStart(2, "0")}/${month.padStart(2, "0")}/${year}` : value; };
 export function dataErrorMessage(error: unknown, fallback = "Não foi possível concluir esta operação.") {
   const code = typeof error === "object" && error !== null && "code" in error ? String(error.code).replace(/^firestore\//, "") : "";
   if (code === "permission-denied") return "Sua conta não possui permissão para esta operação.";
