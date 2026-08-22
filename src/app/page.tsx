@@ -11,10 +11,14 @@ import { dataErrorMessage } from "@/lib/utils";
 import { kg } from "@/lib/utils";
 import { sessions, weights, workouts } from "@/services/data";
 import type { BodyWeight, Workout, WorkoutSession } from "@/types";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 function Dashboard() {
   const { user, profile } = useAuth();
+  const today = useMemo(() => {
+    const formatted = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" }).format(new Date());
+    return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+  }, []);
   const [recent, setRecent] = useState<WorkoutSession[]>([]);
   const [monthSessions, setMonthSessions] = useState<WorkoutSession[]>([]);
   const [plans, setPlans] = useState<Workout[]>([]);
@@ -59,7 +63,7 @@ function Dashboard() {
   const records = [...calculateExerciseRecords(recent).values()].sort((a, b) => b.maxLoadDate.getTime() - a.maxLoadDate.getTime()).slice(0, 4);
   const nextPlan = plans.find((item) => item.active);
 
-  return <AppShell><header><p className="eyebrow">PAINEL PESSOAL</p><h1>Olá, {firstName}.</h1><p>Seu foco constrói sua evolução.</p></header>
+  return <AppShell><header><p className="eyebrow">PAINEL PESSOAL</p><h1>Olá, {firstName}.</h1><p>Seu foco constrói sua evolução.</p><p className="header-date">{today}</p></header>
     {error && <ErrorState message={error} onRetry={() => void load()}/>} {loading ? <Loading/> : <>
       <Card className="hero"><div><span>PRÓXIMO TREINO</span><h2>{nextPlan?.title || "Nenhum treino programado"}</h2><p>{nextPlan?.description || "Crie seu primeiro treino na aba Treino."}</p></div><Link className="button" href="/treino"><Play size={18}/> ABRIR TREINOS</Link></Card>
       <div className="stat-grid"><Card><span>Treinos no mês</span><strong>{month.workouts}</strong></Card><Card><span>Volume do mês</span><strong>{Math.round(month.volume).toLocaleString("pt-BR")} kg</strong></Card><Card><span>Peso atual</span><strong>{body.length ? kg(body.at(-1)!.weight) : "—"}</strong></Card><Card><span>Sequência semanal</span><strong>{streak} {streak === 1 ? "semana" : "semanas"}</strong></Card></div>
