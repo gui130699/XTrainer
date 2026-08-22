@@ -9,7 +9,6 @@ const peer = resolve(process.env.FIREBASE_CONTRACT_PEER || resolve(root, "..", p
 const files = [
   "firestore.rules",
   "firestore.indexes.json",
-  "storage.rules",
   "src/types/index.ts",
   "src/data/default-exercises.ts",
   "src/data/default-training-methods.ts",
