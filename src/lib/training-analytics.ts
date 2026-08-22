@@ -55,29 +55,50 @@ export function exerciseIdentity(exercise: { exerciseId?: string; name: string }
   return exercise.exerciseId || `legacy:${normalizedName(exercise.name)}`;
 }
 
+// Uma série concluída pertence ao exercício realmente executado (actualExerciseId/Name, gravado
+// no momento da conclusão), nunca ao exercício que estava planejado na ficha caso ele tenha sido
+// trocado depois. Séries sem esse carimbo (sessões antigas, ou séries concluídas antes de
+// qualquer troca) usam o SessionExercise atual como já acontecia.
+function executedIdentity(exercise: WorkoutSession["exercises"][number], set: TrainingSet) {
+  const exerciseId = set.actualExerciseId ?? exercise.exerciseId;
+  const name = set.actualExerciseName ?? exercise.name;
+  return { id: exerciseIdentity({ exerciseId, name }), name };
+}
+
+// Uma sessão pode conter, dentro do mesmo SessionExercise, séries de dois exercícios diferentes
+// (antes e depois de uma troca no meio da execução). Por isso o agrupamento é feito por
+// identidade real da série, não por SessionExercise — nunca mistura histórico entre exercícios e
+// nunca reescreve o que já foi executado.
 export function aggregateExerciseSession(session: WorkoutSession): ExerciseSessionAggregate[] {
   if (session.status !== "completed") return [];
   const date = timestampDate(session.startedAt);
   return session.exercises.flatMap((exercise) => {
-    const allCompletedSets = exercise.sets.filter((set) => set.completed);
-    const sets = allCompletedSets.filter(isWorkingSet);
-    if (!sets.length) return [];
-    const bestSet = sets.reduce<BestSet>((best, set) => {
-      const candidate = { load: set.load, reps: set.reps, volume: set.load * set.reps };
-      return candidate.load > best.load || (candidate.load === best.load && candidate.reps > best.reps) ? candidate : best;
-    }, { load: 0, reps: 0, volume: 0 });
-    return [{
-      sessionId: session.id,
-      exerciseId: exerciseIdentity(exercise),
-      name: exercise.name,
-      date,
-      maxLoad: Math.max(...sets.map((set) => set.load)),
-      totalReps: sets.reduce((sum, set) => sum + set.reps, 0),
-      totalVolume: sets.reduce((sum, set) => sum + set.load * set.reps, 0),
-      completedSets: sets.length,
-      bestSet,
-      sets,
-    }];
+    const groups = new Map<string, { name: string; sets: TrainingSet[] }>();
+    for (const set of exercise.sets) {
+      if (!set.completed || !isWorkingSet(set)) continue;
+      const { id, name } = executedIdentity(exercise, set);
+      const bucket = groups.get(id) ?? { name, sets: [] };
+      bucket.sets.push(set);
+      groups.set(id, bucket);
+    }
+    return [...groups.entries()].map(([exerciseId, { name, sets }]) => {
+      const bestSet = sets.reduce<BestSet>((best, set) => {
+        const candidate = { load: set.load, reps: set.reps, volume: set.load * set.reps };
+        return candidate.load > best.load || (candidate.load === best.load && candidate.reps > best.reps) ? candidate : best;
+      }, { load: 0, reps: 0, volume: 0 });
+      return {
+        sessionId: session.id,
+        exerciseId,
+        name,
+        date,
+        maxLoad: Math.max(...sets.map((set) => set.load)),
+        totalReps: sets.reduce((sum, set) => sum + set.reps, 0),
+        totalVolume: sets.reduce((sum, set) => sum + set.load * set.reps, 0),
+        completedSets: sets.length,
+        bestSet,
+        sets,
+      };
+    });
   });
 }
 
@@ -170,7 +191,7 @@ export function calculateMonthlyStats(sessions: WorkoutSession[], reference = ne
   };
 }
 
-function mondayKey(date: Date) {
+export function mondayKey(date: Date) {
   const value = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const day = (value.getDay() + 6) % 7;
   value.setDate(value.getDate() - day);

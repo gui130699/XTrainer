@@ -1,6 +1,6 @@
 # Esquema Firestore compartilhado — XTrainer
 
-Atualizado em 18/08/2026. Os dois PWAs usam o projeto Firebase `xtrainer-45f8d`. Campos marcados com `?` são opcionais para preservar documentos antigos.
+Atualizado em 22/08/2026. Os dois PWAs usam o projeto Firebase `xtrainer-45f8d`. Campos marcados com `?` são opcionais para preservar documentos antigos.
 
 ## Princípios
 
@@ -36,7 +36,6 @@ Leitura pública para permitir decidir a experiência de login. Escrita sempre n
 | `height` | number cm | não |
 | `sex` | string | não |
 | `goal` | string | não |
-| `photoURL` | string | não |
 | `createdAt` | Timestamp | não |
 | `updatedAt` | Timestamp | não |
 
@@ -95,9 +94,19 @@ Somente o owner lê/escreve. Arquivamento usa `active: false`; exclusão do trei
 
 Sessão ativa usa ID fixo `active-{uid}`. O início é transacional. Ao finalizar/cancelar, uma transação cria um documento histórico com auto-ID e remove o ativo. Um histórico `completed/cancelled` não pode voltar a `active`.
 
-`SessionExercise` contém snapshot de `exerciseId`, nome, ordem, alvo e sets. `TrainingSet`: `id`, `load`, `reps`, `completed`, `volume`; `rpe?`, `rir?`, `completedAt?`.
+`SessionExercise` contém snapshot de `exerciseId`, nome, ordem, alvo e sets, além de (opcionais, versão 22/08/2026):
 
-Volume canônico: soma de `load * reps` somente para séries `completed === true`. Recordes e gráficos usam somente sessões `status === completed`.
+- `originalExerciseId?`, `originalExerciseName?`: exercício original planejado, gravado apenas na primeira troca (trocas seguintes não sobrescrevem);
+- `substitutionType?`: `session-only \| permanent`;
+- `substitutedAt?`: Timestamp da troca;
+- `skipInfo?`: `{ skipped: boolean; reasonCode?: string; reasonText?: string; skippedAt?: Timestamp }`.
+
+`TrainingSet`: `id`, `load`, `reps`, `completed`, `volume`; `rpe?`, `rir?`, `completedAt?`, além de (opcionais):
+
+- `actualExerciseId?`, `actualExerciseName?`: identidade do exercício realmente executado nesta série específica, gravada no momento em que a série é concluída. Existe porque uma troca no meio da execução pode deixar séries de dois exercícios diferentes dentro do mesmo `SessionExercise` — as séries já concluídas antes da troca ficam com esse carimbo e nunca são reatribuídas ao novo exercício. Ausente = usa `SessionExercise.exerciseId/name` (comportamento anterior a esta versão, preservado);
+- `skipped?`: marcado quando "pular hoje" é aplicado a uma série ainda pendente. Nunca coexiste com `completed: true`.
+
+Volume canônico: soma de `load * reps` somente para séries `completed === true`. Séries `skipped` nunca contam volume, séries efetivas ou recordes. Recordes, histórico e uso por exercício sempre resolvem a identidade real via `actualExerciseId ?? SessionExercise.exerciseId` (ver `aggregateExerciseSession` em `src/lib/training-analytics.ts`), nunca pelo exercício que só estava planejado na ficha.
 
 ## `bodyWeights/{weightId}`
 
@@ -141,12 +150,20 @@ Campos obrigatórios: `adminUid`, `action`, `entityType`, `entityId`, `timestamp
 
 ## Storage
 
-Rotas permitidas:
+O projeto não usa Firebase Storage. Fotos de perfil e de avaliação física foram removidas (o plano gratuito do Firebase não comporta Storage); não existe `storage.rules` em nenhum dos dois repositórios, e `check-firebase-contract` não verifica esse arquivo.
 
-- `users/{uid}/profile/{fileName}`;
-- `users/{uid}/assessments/{assessmentId}/{fileName}`.
+## `exerciseSubstitutionPreferences/{id}`
 
-Somente o próprio UID lê/grava/exclui. Upload aceita `image/*` menor que 8 MB. Não há catch-all permissivo e admin não acessa fotos de terceiros.
+Coleção privada. Alternativas de troca preferidas pelo próprio usuário para um exercício — informação pessoal, nunca gravada no catálogo global `exercises`.
+
+| Campo | Tipo | Obrigatório |
+|---|---|---:|
+| `ownerId` | string | sim |
+| `exerciseId` | string | sim |
+| `alternativeExerciseIds` | string[] | sim |
+| `createdAt`, `updatedAt` | Timestamp | não |
+
+A ordem da lista é a prioridade de exibição no seletor de troca. `alternativeExerciseIds` nunca contém o próprio `exerciseId` nem duplicados (validado em `src/lib/exercise-preferences.ts`, não nas Rules). Se uma alternativa salva for desativada depois, a referência permanece no documento; a UI mostra "Exercício indisponível" e não a sugere em novas trocas. Somente o owner lê/escreve; admin não acessa.
 
 ## Índices compostos
 
@@ -155,6 +172,8 @@ Somente o próprio UID lê/grava/exclui. Upload aceita `image/*` menor que 8 MB.
 - `workoutSessions`: `ownerId ASC, status ASC, startedAt DESC`;
 - `bodyWeights`: `ownerId ASC, date ASC`;
 - `physicalAssessments`: `ownerId ASC, date DESC`.
+
+`exerciseSubstitutionPreferences` não exige índice composto: a única consulta filtra por `ownerId` (índice automático de campo único).
 
 ## Retrocompatibilidade
 

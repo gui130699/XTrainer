@@ -1,14 +1,28 @@
 "use client";
-import { Check, ChevronUp, ExternalLink, Pencil, Repeat } from "lucide-react";
+import { Check, ChevronUp, ExternalLink, Pencil, Repeat, SkipForward, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { Button, Card } from "@/components/ui";
 import { trainingStageLabel } from "@/lib/training-methods";
 import { ExerciseSwapPicker } from "@/components/training-methods/exercise-swap-picker";
 import type { Exercise, SessionExercise, TrainingSet, WorkoutExerciseGroup } from "@/types";
 
-export function TrainingGroupExecution({ group, members, allExercises, library, onChange, onComplete, onSwap, onSync }: { group: WorkoutExerciseGroup; members: SessionExercise[]; allExercises: SessionExercise[]; library: Exercise[]; onChange: (exerciseIndex: number, setIndex: number, data: Partial<TrainingSet>) => void; onComplete: (exerciseIndex: number, setIndex: number, completed: boolean) => void; onSwap: (exerciseIndex: number, exercise: Exercise) => void; onSync: () => void }) {
+export function TrainingGroupExecution({ group, members, allExercises, library, preferredIds, onChange, onComplete, onPickReplacement, onTogglePreferred, onSkip, onUndoSkip, onSync }: {
+  group: WorkoutExerciseGroup;
+  members: SessionExercise[];
+  allExercises: SessionExercise[];
+  library: Exercise[];
+  preferredIds: string[];
+  onChange: (exerciseIndex: number, setIndex: number, data: Partial<TrainingSet>) => void;
+  onComplete: (exerciseIndex: number, setIndex: number, completed: boolean) => void;
+  onPickReplacement: (exerciseIndex: number, exercise: Exercise) => void;
+  onTogglePreferred: (exerciseId: string, candidateId: string) => void;
+  onSkip: (exerciseIndex: number) => void;
+  onUndoSkip: (exerciseIndex: number) => void;
+  onSync: () => void;
+}) {
   const rounds = Math.max(...members.map((item) => item.sets.length));
-  const allCompleted = members.every((exercise) => exercise.sets.length > 0 && exercise.sets.every((item) => item.completed));
+  const executableMembers = members.filter((item) => !item.skipInfo?.skipped);
+  const allCompleted = executableMembers.length > 0 && executableMembers.every((exercise) => exercise.sets.length > 0 && exercise.sets.every((item) => item.completed || item.skipped));
   const [collapsed, setCollapsed] = useState(false);
   const [swappingId, setSwappingId] = useState<string | null>(null);
   const [prevAllCompleted, setPrevAllCompleted] = useState(allCompleted);
@@ -20,11 +34,19 @@ export function TrainingGroupExecution({ group, members, allExercises, library, 
     <div className="group-members-header">{members.map((exercise) => {
       const exerciseIndex = allExercises.findIndex((item) => item.id === exercise.id);
       const videoUrl = library.find((item) => item.id === exercise.exerciseId)?.videoUrl;
+      const skipped = exercise.skipInfo?.skipped === true;
       return <div className="group-member-tools" key={exercise.id}>
-        <span>{exercise.name}</span>
-        {videoUrl && <a className="video-link" href={videoUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={14}/> Vídeo</a>}
-        <button type="button" className="text-button" onClick={() => setSwappingId(exercise.id)}><Repeat size={14}/> Trocar</button>
-        {swappingId === exercise.id && <ExerciseSwapPicker library={library} excludeId={exercise.exerciseId} onSelect={(item) => { onSwap(exerciseIndex, item); setSwappingId(null); }} onClose={() => setSwappingId(null)}/>}
+        <span>{exercise.name}
+          {exercise.substitutionType === "session-only" && <span className="status-badge is-session-only">Só nesta sessão</span>}
+          {skipped && <span className="status-badge is-skipped">Pulado hoje</span>}
+        </span>
+        {!skipped && <>
+          {videoUrl && <a className="video-link" href={videoUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={14}/> Vídeo</a>}
+          <button type="button" className="text-button" onClick={() => setSwappingId(exercise.id)}><Repeat size={14}/> Trocar</button>
+          <button type="button" className="text-button" onClick={() => onSkip(exerciseIndex)}><SkipForward size={14}/> Pular hoje</button>
+        </>}
+        {skipped && <button type="button" className="text-button" onClick={() => onUndoSkip(exerciseIndex)}><Undo2 size={14}/> Desfazer pulo</button>}
+        {swappingId === exercise.id && <ExerciseSwapPicker library={library} excludeId={exercise.exerciseId} preferredIds={preferredIds} onSelect={(item) => { onPickReplacement(exerciseIndex, item); setSwappingId(null); }} onTogglePreferred={(candidateId) => onTogglePreferred(exercise.exerciseId, candidateId)} onClose={() => setSwappingId(null)}/>}
       </div>;
     })}</div>
 
@@ -40,6 +62,7 @@ export function TrainingGroupExecution({ group, members, allExercises, library, 
         const set = exercise.sets[round];
         if (!set) return null;
         const exerciseIndex = allExercises.findIndex((item) => item.id === exercise.id);
+        if (set.skipped) return <div className="set method-stage is-skipped" key={set.id}><b>{position + 1}. {exercise.name}</b><small>Pulado hoje</small></div>;
         return <div className={`set method-stage ${set.completed ? "completed" : ""}`} key={set.id}>
           <b>{position + 1}. {exercise.name}</b>
           <small>{trainingStageLabel(set)}</small>

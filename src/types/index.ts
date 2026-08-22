@@ -183,6 +183,23 @@ export interface TrainingSet {
   tempo?: TrainingTempo;
   restAfterSeconds?: number;
   toFailure?: boolean;
+  // Identidade do exercício realmente executado nesta série. Preenchido somente quando a
+  // série é concluída depois de uma troca, para congelar a identidade histórica mesmo que o
+  // SessionExercise seja trocado novamente depois. Ausente = usa SessionExercise.exerciseId/name.
+  actualExerciseId?: Id;
+  actualExerciseName?: string;
+  // Marcada quando o exercício é pulado nesta sessão e a série ainda não estava concluída.
+  // Nunca conta em analytics (volume, séries efetivas, recordes).
+  skipped?: boolean;
+}
+
+export type SubstitutionType = "session-only" | "permanent";
+
+export interface SkipInfo {
+  skipped: boolean;
+  reasonCode?: string;
+  reasonText?: string;
+  skippedAt?: Timestamp;
 }
 
 export interface SessionExercise {
@@ -192,6 +209,13 @@ export interface SessionExercise {
   order: number;
   target: WorkoutExercise;
   sets: TrainingSet[];
+  // Identidade original planejada, preenchida na primeira troca (nunca sobrescrita por trocas
+  // seguintes) para permitir mostrar "Substituiu: <original>" no histórico.
+  originalExerciseId?: Id;
+  originalExerciseName?: string;
+  substitutionType?: SubstitutionType;
+  substitutedAt?: Timestamp;
+  skipInfo?: SkipInfo;
 }
 
 export interface WorkoutSession {
@@ -270,6 +294,15 @@ export interface PhysicalAssessment {
   skinfolds?: Skinfolds;
   assessmentProtocol?: string;
   notes?: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface ExerciseSubstitutionPreference {
+  id: Id;
+  ownerId: Id;
+  exerciseId: Id;
+  alternativeExerciseIds: Id[];
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

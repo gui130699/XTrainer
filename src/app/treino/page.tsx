@@ -8,13 +8,22 @@ import { MethodConfigEditor } from "@/components/training-methods/method-config-
 import { MethodSelector } from "@/components/training-methods/method-selector";
 import { TrainingMethodExecution } from "@/components/training-methods/training-method-execution";
 import { TrainingGroupExecution } from "@/components/training-methods/training-group-execution";
+import { ExerciseSwapScopeModal } from "@/components/training/exercise-swap-scope-modal";
+import { SkipExerciseModal } from "@/components/training/skip-exercise-modal";
+import { TrainingPreferencesPanel } from "@/components/training/training-preferences-panel";
 import { detectNewRecords, timestampDate, type RecordEvent } from "@/lib/training-analytics";
-import { createMethodConfig, normalTrainingMethod, snapshotMethod } from "@/lib/training-methods";
+import { addAlternative, removeAlternative } from "@/lib/exercise-preferences";
+import { createMethodConfig, groupRoundRestOverride, normalTrainingMethod, snapshotMethod } from "@/lib/training-methods";
+import { primeTrainingAudio } from "@/lib/training-alerts";
 import { dataErrorMessage, exerciseMuscleGroups, normalizeSearchText } from "@/lib/utils";
 import { exercises, sessions, workouts } from "@/services/data";
+import { exercisePreferences } from "@/services/exercise-preferences";
 import { trainingMethodsService } from "@/services/training-methods";
-import type { Exercise, SyncStatus, TrainingMethod, TrainingSet, Workout, WorkoutExercise, WorkoutExerciseGroup, WorkoutSession } from "@/types";
-import { Archive, Bell, Check, ChevronDown, Copy, ExternalLink, History, Pencil, Play, Plus, Search, Timer } from "lucide-react";
+import { useTrainingPreferences } from "@/hooks/use-training-preferences";
+import { useScreenWakeLock } from "@/hooks/use-screen-wake-lock";
+import { useTrainingAlerts } from "@/hooks/use-training-alerts";
+import type { Exercise, ExerciseSubstitutionPreference, SubstitutionType, SyncStatus, TrainingMethod, TrainingSet, Workout, WorkoutExercise, WorkoutExerciseGroup, WorkoutSession } from "@/types";
+import { Archive, Bell, Check, ChevronDown, Copy, ExternalLink, History, MonitorSmartphone, Pencil, Play, Plus, Search, Settings, Timer } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { workoutExerciseIssue, workoutFormSchema } from "@/lib/validation";
@@ -77,6 +86,13 @@ function Work() {
   const [completedCounts, setCompletedCounts] = useState<Map<string, number>>(new Map());
   const [history, setHistory] = useState<WorkoutSession[]>([]);
   const [notifyPermission, setNotifyPermission] = useState<NotificationPermission | "unsupported">(() => (typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported"));
+  const [exercisePrefs, setExercisePrefs] = useState<ExerciseSubstitutionPreference[]>([]);
+  const [swapTarget, setSwapTarget] = useState<{ exerciseIndex: number; replacement: Exercise; fromName: string } | null>(null);
+  const [swapSaving, setSwapSaving] = useState(false);
+  const [skipTarget, setSkipTarget] = useState<number | null>(null);
+  const [skipSaving, setSkipSaving] = useState(false);
+  const [preferencesPanelOpen, setPreferencesPanelOpen] = useState(false);
+  const { preferences, update: updateTrainingPreferences } = useTrainingPreferences();
   const prevRestSecondsRef = useRef(0);
 
   const load = useCallback(async () => {
@@ -84,18 +100,20 @@ function Work() {
     setLoading(true);
     setLoadError("");
     try {
-      const [plansResult, activeResult, libraryResult, methodsResult, completedResult] = await Promise.allSettled([
+      const [plansResult, activeResult, libraryResult, methodsResult, completedResult, preferencesResult] = await Promise.allSettled([
         workouts.list(uid),
         sessions.getActive(uid),
         exercises.list(),
         trainingMethodsService.list(),
         sessions.listAllCompleted(uid),
+        exercisePreferences.list(uid),
       ]);
 
       if (plansResult.status === "fulfilled") setPlans(plansResult.value);
       if (activeResult.status === "fulfilled") setActive(activeResult.value);
       if (libraryResult.status === "fulfilled") setLibrary(libraryResult.value);
       setMethods(methodsResult.status === "fulfilled" && methodsResult.value.length ? methodsResult.value : [normalTrainingMethod()]);
+      if (preferencesResult.status === "fulfilled") setExercisePrefs(preferencesResult.value);
       if (completedResult.status === "fulfilled") {
         const counts = new Map<string, number>();
         for (const completedSession of completedResult.value) counts.set(completedSession.workoutId, (counts.get(completedSession.workoutId) ?? 0) + 1);
@@ -168,6 +186,12 @@ function Work() {
     if (!session?.id) return;
     return sessions.watchSyncState(session.id, setHasPendingWrites);
   }, [session?.id]);
+
+  // Tela sempre ativa só existe com sessão de treino ativa + preferência ligada (nunca em
+  // dashboard/histórico/perfil/evolução, que não usam este hook).
+  const { active: wakeLockActive, supported: wakeLockSupported } = useScreenWakeLock(Boolean(session) && preferences.wakeLockEnabled);
+  // Som/vibração do fim do descanso, sem duplicar o cronômetro existente.
+  useTrainingAlerts(restSeconds, session?.restEndsAt?.toMillis() ?? null, preferences);
 
   const syncStatus: SyncStatus = saveError ? "error" : !isOnline ? "offline" : hasPendingWrites ? "saving" : "saved";
 
@@ -338,6 +362,9 @@ function Work() {
   async function start(workout: Workout) {
     setMessage("");
     setSaveError(false);
+    // Interação legítima do usuário: satisfaz as políticas de autoplay dos navegadores para o
+    // som do cronômetro, sem precisar de um botão "Ativar alertas" separado.
+    primeTrainingAudio();
     try {
       const created = await sessions.start(uid!, workout, history);
       setSession(created);
@@ -382,8 +409,14 @@ function Work() {
   async function completeSet(exerciseIndex: number, setIndex: number, completed: boolean) {
     const next = changeSet(exerciseIndex, setIndex, { completed });
     if (!next) return;
-    const set = next.exercises[exerciseIndex].sets[setIndex];
-    const restEndsAt = completed && (set.restAfterSeconds ?? next.exercises[exerciseIndex].target.restSeconds) > 0 ? Timestamp.fromMillis(Date.now() + (set.restAfterSeconds ?? next.exercises[exerciseIndex].target.restSeconds) * 1000) : completed ? undefined : next.restEndsAt;
+    const exercise = next.exercises[exerciseIndex];
+    const set = exercise.sets[setIndex];
+    // Exercício agrupado: o descanso pré-calculado assume que ninguém foi pulado. Se um membro
+    // foi pulado, a posição "última do grupo" pode mudar — groupRoundRestOverride recalcula
+    // dinamicamente; retorna null quando o valor pré-calculado já está correto.
+    const groupOverride = completed ? groupRoundRestOverride(next, exercise, setIndex) : null;
+    const restSecondsToUse = groupOverride ?? (set.restAfterSeconds ?? exercise.target.restSeconds);
+    const restEndsAt = completed && restSecondsToUse > 0 ? Timestamp.fromMillis(Date.now() + restSecondsToUse * 1000) : completed ? undefined : next.restEndsAt;
     await syncSession({ ...next, restEndsAt });
     setClock(Date.now());
   }
@@ -398,9 +431,66 @@ function Work() {
     await syncSession({ ...session, exercises: session.exercises.map((exercise, index) => index !== exerciseIndex ? exercise : { ...exercise, sets: exercise.sets.filter((_, itemIndex) => itemIndex !== setIndex) }) });
   }
 
-  async function swapExercise(exerciseIndex: number, replacement: Exercise) {
+  function beginSwap(exerciseIndex: number, replacement: Exercise) {
     if (!session) return;
-    await syncSession({ ...session, exercises: session.exercises.map((exercise, index) => index !== exerciseIndex ? exercise : { ...exercise, exerciseId: replacement.id, name: replacement.name }) });
+    setSwapTarget({ exerciseIndex, replacement, fromName: session.exercises[exerciseIndex].name });
+  }
+
+  async function confirmSwap(scope: SubstitutionType) {
+    if (!session || !swapTarget) return;
+    setSwapSaving(true);
+    try {
+      const workout = scope === "permanent" ? plans.find((item) => item.id === session.workoutId) : undefined;
+      const nextExercises = await sessions.swapExercise(session, swapTarget.exerciseIndex, { id: swapTarget.replacement.id, name: swapTarget.replacement.name }, scope, workout);
+      localSession({ ...session, exercises: nextExercises });
+      if (scope === "permanent") await reloadPlans();
+      setSwapTarget(null);
+    } catch (error) {
+      setMessage(dataErrorMessage(error, "Não foi possível trocar o exercício."));
+    } finally {
+      setSwapSaving(false);
+    }
+  }
+
+  function beginSkip(exerciseIndex: number) {
+    setSkipTarget(exerciseIndex);
+  }
+
+  async function confirmSkip(reasonCode?: string, reasonText?: string) {
+    if (!session || skipTarget === null) return;
+    setSkipSaving(true);
+    try {
+      const nextExercises = await sessions.skipExercise(session, skipTarget, reasonCode, reasonText);
+      localSession({ ...session, exercises: nextExercises });
+      setSkipTarget(null);
+    } catch (error) {
+      setMessage(dataErrorMessage(error, "Não foi possível pular o exercício."));
+    } finally {
+      setSkipSaving(false);
+    }
+  }
+
+  async function undoSkip(exerciseIndex: number) {
+    if (!session) return;
+    try {
+      const nextExercises = await sessions.undoSkipExercise(session, exerciseIndex);
+      localSession({ ...session, exercises: nextExercises });
+    } catch (error) {
+      setMessage(dataErrorMessage(error, "Não foi possível desfazer o pulo."));
+    }
+  }
+
+  async function togglePreferred(exerciseId: string, candidateId: string) {
+    if (!uid) return;
+    const existing = exercisePrefs.find((item) => item.exerciseId === exerciseId);
+    const current = existing?.alternativeExerciseIds ?? [];
+    const next = current.includes(candidateId) ? removeAlternative(current, candidateId) : addAlternative(current, exerciseId, candidateId);
+    try {
+      await exercisePreferences.save(uid, exerciseId, next, existing?.id);
+      setExercisePrefs(await exercisePreferences.list(uid));
+    } catch {
+      setMessage("Não foi possível atualizar suas alternativas preferidas.");
+    }
   }
 
   async function finish() {
@@ -448,10 +538,17 @@ function Work() {
 
   if (summary) return <AppShell><header><p className="eyebrow">TREINO CONCLUÍDO</p><h1>{summary.session.workoutName}</h1><p>Seu desempenho foi salvo no histórico.</p></header><div className="stat-grid"><Card><span>Duração</span><strong>{Math.round((summary.session.durationSeconds ?? 0) / 60)} min</strong></Card><Card><span>Volume</span><strong>{Math.round(summary.session.totalVolume).toLocaleString("pt-BR")} kg</strong></Card><Card><span>Séries</span><strong>{summary.session.totalSets}</strong></Card><Card><span>Exercícios</span><strong>{summary.session.exercises.length}</strong></Card></div><Card><h2>Recordes alcançados</h2>{summary.records.length ? summary.records.map((record, index) => <div className="row" key={`${record.exerciseId}-${record.kind}-${index}`}><strong>{record.name}</strong><span>{record.kind === "load" ? `${record.value.toLocaleString("pt-BR")} kg` : record.kind === "reps" ? `${record.value} repetições` : `${Math.round(record.value).toLocaleString("pt-BR")} kg de volume`}</span></div>) : <Empty title="Nenhum recorde novo nesta sessão" detail="Continue treinando para acompanhar sua progressão automática."/>}{summary.analyticsWarning && <p className="error">{summary.analyticsWarning}</p>}</Card><Button onClick={() => setSummary(null)}>VOLTAR AOS TREINOS</Button></AppShell>;
 
-  if (session) return <AppShell><header><p className="eyebrow">EM ANDAMENTO</p><h1>{session.workoutName}</h1><p>{session.totalSets} séries concluídas · {Math.round(session.totalVolume).toLocaleString("pt-BR")} kg</p><p className={`sync-status ${syncStatus}`} role="status">{syncStatus === "saving" ? "Salvando..." : syncStatus === "saved" ? "Salvo" : syncStatus === "offline" ? "Salvo neste dispositivo. Aguardando sincronização." : syncStatus === "error" ? "Erro ao sincronizar. Use Tentar novamente." : "Alterações locais"}{syncStatus === "error" && <button className="text-button" onClick={() => void syncSession(session)}>Tentar novamente</button>}</p>{notifyPermission === "default" && <button type="button" className="text-button" onClick={() => void enableNotifications()}><Bell size={15}/> Ativar notificações do cronômetro de descanso</button>}{notifyPermission === "denied" && <p className="error">Notificações bloqueadas pelo navegador. Ative nas configurações do site para ver o cronômetro de descanso nas notificações.</p>}</header>
+  if (session) return <AppShell><header><div className="row" style={{ border: 0, padding: 0, alignItems: "flex-start" }}><div><p className="eyebrow">EM ANDAMENTO</p><h1>{session.workoutName}</h1><p>{session.totalSets} séries concluídas · {Math.round(session.totalVolume).toLocaleString("pt-BR")} kg</p></div><button type="button" className="icon-button" onClick={() => setPreferencesPanelOpen(true)} aria-label="Preferências do treino"><Settings size={18}/></button></div><p className={`sync-status ${syncStatus}`} role="status">{syncStatus === "saving" ? "Salvando..." : syncStatus === "saved" ? "Salvo" : syncStatus === "offline" ? "Salvo neste dispositivo. Aguardando sincronização." : syncStatus === "error" ? "Erro ao sincronizar. Use Tentar novamente." : "Alterações locais"}{syncStatus === "error" && <button className="text-button" onClick={() => void syncSession(session)}>Tentar novamente</button>}{wakeLockActive && <span className="status-badge is-wake-lock"><MonitorSmartphone size={12}/> Tela ativa</span>}</p>{notifyPermission === "default" && <button type="button" className="text-button" onClick={() => void enableNotifications()}><Bell size={15}/> Ativar notificações do cronômetro de descanso</button>}{notifyPermission === "denied" && <p className="error">Notificações bloqueadas pelo navegador. Ative nas configurações do site para ver o cronômetro de descanso nas notificações.</p>}</header>
     {restSeconds > 0 && <Card className="rest"><Timer/><strong>{String(Math.floor(restSeconds / 60)).padStart(2, "0")}:{String(restSeconds % 60).padStart(2, "0")}</strong><Button onClick={() => void syncSession({ ...session, restEndsAt: undefined })}>PULAR DESCANSO</Button><button className="text-button" onClick={() => void syncSession({ ...session, restEndsAt: Timestamp.fromMillis((session.restEndsAt?.toMillis() ?? Date.now()) + 15000) })}>+15s</button></Card>}
-    {session.exercises.map((exercise, exerciseIndex) => { if (exercise.target.groupId) { const group = session.exerciseGroups?.find((item) => item.id === exercise.target.groupId); if (!group || group.exerciseIds[0] !== exercise.id) return null; const members = group.exerciseIds.map((id) => session.exercises.find((item) => item.id === id)).filter((item): item is typeof exercise => Boolean(item)); return <TrainingGroupExecution key={group.id} group={group} members={members} allExercises={session.exercises} library={library} onChange={changeSet} onComplete={(item, set, completed) => void completeSet(item, set, completed)} onSwap={swapExercise} onSync={() => session && void syncSession(session)}/>; } return <TrainingMethodExecution key={exercise.id} exercise={exercise} exerciseIndex={exerciseIndex} library={library} onChange={changeSet} onComplete={(item, set, completed) => void completeSet(item, set, completed)} onAdd={(item) => void addSet(item)} onRemove={(item, set) => void removeSet(item, set)} onSwap={swapExercise} onSync={() => session && void syncSession(session)}/>; })}
+    {session.exercises.map((exercise, exerciseIndex) => {
+      const preferredIds = exercisePrefs.find((item) => item.exerciseId === exercise.exerciseId)?.alternativeExerciseIds ?? [];
+      if (exercise.target.groupId) { const group = session.exerciseGroups?.find((item) => item.id === exercise.target.groupId); if (!group || group.exerciseIds[0] !== exercise.id) return null; const members = group.exerciseIds.map((id) => session.exercises.find((item) => item.id === id)).filter((item): item is typeof exercise => Boolean(item)); return <TrainingGroupExecution key={group.id} group={group} members={members} allExercises={session.exercises} library={library} preferredIds={preferredIds} onChange={changeSet} onComplete={(item, set, completed) => void completeSet(item, set, completed)} onPickReplacement={beginSwap} onTogglePreferred={(exerciseId, candidateId) => void togglePreferred(exerciseId, candidateId)} onSkip={beginSkip} onUndoSkip={(item) => void undoSkip(item)} onSync={() => session && void syncSession(session)}/>; }
+      return <TrainingMethodExecution key={exercise.id} exercise={exercise} exerciseIndex={exerciseIndex} library={library} preferredIds={preferredIds} onChange={changeSet} onComplete={(item, set, completed) => void completeSet(item, set, completed)} onAdd={(item) => void addSet(item)} onRemove={(item, set) => void removeSet(item, set)} onPickReplacement={beginSwap} onTogglePreferred={(exerciseId, candidateId) => void togglePreferred(exerciseId, candidateId)} onSkip={beginSkip} onUndoSkip={(item) => void undoSkip(item)} onSync={() => session && void syncSession(session)}/>;
+    })}
     {message && <p className="error" role="alert">{message}</p>}<Button className="finish" onClick={() => void finish()} disabled={saving}>{saving ? "FINALIZANDO..." : "FINALIZAR TREINO"}</Button><button className="text-button" onClick={() => void cancel(session)} disabled={saving}>Cancelar treino</button>
+    {swapTarget && <ExerciseSwapScopeModal fromName={swapTarget.fromName} toName={swapTarget.replacement.name} saving={swapSaving} onConfirm={(scope) => void confirmSwap(scope)} onCancel={() => setSwapTarget(null)}/>}
+    {skipTarget !== null && <SkipExerciseModal exerciseName={session.exercises[skipTarget].name} saving={skipSaving} onConfirm={(reasonCode, reasonText) => void confirmSkip(reasonCode, reasonText)} onCancel={() => setSkipTarget(null)}/>}
+    {preferencesPanelOpen && <TrainingPreferencesPanel preferences={preferences} wakeLockSupported={wakeLockSupported} onUpdate={updateTrainingPreferences} onClose={() => setPreferencesPanelOpen(false)}/>}
   </AppShell>;
 
   return <AppShell><header><p className="eyebrow">SESSÃO</p><h1>Qual treino vamos fazer?</h1><Button onClick={() => openBuilder()}><Plus size={16}/> NOVO TREINO</Button></header>

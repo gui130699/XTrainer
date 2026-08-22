@@ -12,6 +12,7 @@ let userB;
 const profile = (uid, role = "user") => ({ uid, name: uid, email: `${uid}@test.dev`, role });
 const workout = (ownerId) => ({ ownerId, name: "Treino A", title: "Treino A", muscleGroups: ["Peito"], exercises: [], active: true });
 const session = (ownerId, status = "active") => ({ ownerId, workoutId: "work-a", workoutName: "Treino A", exercises: [], totalVolume: 0, totalSets: 0, status });
+const substitutionPreference = (ownerId) => ({ ownerId, exerciseId: "supino", alternativeExerciseIds: ["supino-maquina"] });
 
 before(async () => {
   environment = await initializeTestEnvironment({ projectId: "xtrainer-45f8d", firestore: { rules: readFileSync("firestore.rules", "utf8") } });
@@ -28,6 +29,7 @@ before(async () => {
     await setDoc(doc(database, "workoutSessions", "history-a"), session("user-a", "completed"));
     await setDoc(doc(database, "bodyWeights", "weight-a"), { ownerId: "user-a", date: "2026-08-17", weight: 80 });
     await setDoc(doc(database, "physicalAssessments", "assessment-a"), { ownerId: "user-a", date: "2026-08-17", type: "quick", measurements: {} });
+    await setDoc(doc(database, "exerciseSubstitutionPreferences", "pref-a"), substitutionPreference("user-a"));
   });
   anonymous = environment.unauthenticatedContext().firestore();
   admin = environment.authenticatedContext("admin").firestore();
@@ -53,7 +55,7 @@ test("cadastro comum não consegue promover a si mesmo a administrador", async (
 test("usuário vê somente o próprio perfil e dados corporais", async () => {
   await assertSucceeds(getDoc(doc(userA, "users", "user-a")));
   await assertFails(getDoc(doc(userA, "users", "user-b")));
-  for (const path of ["workouts/work-a", "workoutSessions/history-a", "bodyWeights/weight-a", "physicalAssessments/assessment-a"]) {
+  for (const path of ["workouts/work-a", "workoutSessions/history-a", "bodyWeights/weight-a", "physicalAssessments/assessment-a", "exerciseSubstitutionPreferences/pref-a"]) {
     await assertSucceeds(getDoc(doc(userA, path)));
     await assertFails(getDoc(doc(userB, path)));
   }
@@ -115,10 +117,20 @@ test("avaliação parcial pode ser criada, editada e excluída pelo dono", async
 
 test("administrador gerencia catálogo e auditoria, mas não acessa dados pessoais", async () => {
   await assertSucceeds(getDocs(collection(admin, "users")));
-  for (const name of ["workouts", "workoutSessions", "bodyWeights", "physicalAssessments"]) await assertFails(getDocs(collection(admin, name)));
+  for (const name of ["workouts", "workoutSessions", "bodyWeights", "physicalAssessments", "exerciseSubstitutionPreferences"]) await assertFails(getDocs(collection(admin, name)));
   await assertFails(getDoc(doc(admin, "physicalAssessments", "assessment-a")));
+  await assertFails(getDoc(doc(admin, "exerciseSubstitutionPreferences", "pref-a")));
   await assertSucceeds(setDoc(doc(admin, "auditLogs", "log-1"), { adminUid: "admin", action: "exercise.update", entityType: "exercise", entityId: "supino", summary: "Teste", timestamp: Timestamp.now() }));
   await assertFails(updateDoc(doc(admin, "auditLogs", "log-1"), { summary: "Alterado" }));
+});
+
+test("alternativas preferidas de exercício pertencem exclusivamente ao dono", async () => {
+  await assertSucceeds(setDoc(doc(userA, "exerciseSubstitutionPreferences", "new-a"), substitutionPreference("user-a")));
+  await assertFails(setDoc(doc(userA, "exerciseSubstitutionPreferences", "new-b"), substitutionPreference("user-b")));
+  await assertSucceeds(updateDoc(doc(userA, "exerciseSubstitutionPreferences", "pref-a"), { alternativeExerciseIds: ["supino-maquina", "supino-halteres"] }));
+  await assertFails(updateDoc(doc(userA, "exerciseSubstitutionPreferences", "pref-a"), { ownerId: "user-b" }));
+  await assertFails(getDoc(doc(userB, "exerciseSubstitutionPreferences", "pref-a")));
+  await assertSucceeds(deleteDoc(doc(userA, "exerciseSubstitutionPreferences", "pref-a")));
 });
 
 test("coleções não declaradas permanecem fechadas", async () => {

@@ -23,7 +23,7 @@ import {
 import { db } from "@/lib/firebase";
 import { DEFAULT_EXERCISES } from "@/data/default-exercises";
 import { normalizeSearchText } from "@/lib/utils";
-import { createTrainingSets, normalizeWorkoutMethod } from "@/lib/training-methods";
+import { applyExerciseSkip, applyExerciseSwap, createTrainingSets, normalizeWorkoutMethod, undoExerciseSkip } from "@/lib/training-methods";
 import { lastUsedLoadsByBlock } from "@/lib/training-analytics";
 import {
   normalizeAssessmentDocument,
@@ -37,6 +37,7 @@ import type {
   Exercise,
   PhysicalAssessment,
   SeedResult,
+  SubstitutionType,
   Workout,
   WorkoutSession,
 } from "@/types";
@@ -398,4 +399,37 @@ export const sessions = {
       (snapshot) => callback(snapshot.metadata.hasPendingWrites),
       () => callback(false),
     ),
+  // "session-only" só grava a sessão ativa. "permanent" também substitui o exercício no treino
+  // salvo, em um único writeBatch (evita o estado inconsistente de só um dos dois documentos
+  // ser atualizado). Séries já concluídas nunca são reescritas: applyExerciseSwap já congela a
+  // identidade real delas antes desta função gravar.
+  swapExercise: async (session: WorkoutSession, exerciseIndex: number, replacement: { id: string; name: string }, scope: SubstitutionType, workout?: Workout): Promise<WorkoutSession["exercises"]> => {
+    const exercise = session.exercises[exerciseIndex];
+    const updatedExercise = applyExerciseSwap(exercise, replacement, scope);
+    const nextExercises = session.exercises.map((item, index) => index === exerciseIndex ? updatedExercise : item);
+    if (scope === "permanent" && workout) {
+      const batch = writeBatch(db);
+      const nextWorkoutExercises = workout.exercises.map((item) => item.id === exercise.id ? { ...item, exerciseId: replacement.id, name: replacement.name } : item);
+      batch.update(doc(db, "workouts", workout.id), withoutUndefined({ exercises: withoutUndefinedDeep(nextWorkoutExercises), updatedAt: serverTimestamp() }));
+      batch.update(doc(db, "workoutSessions", session.id), { exercises: nextExercises });
+      await batch.commit();
+    } else {
+      await updateDoc(doc(db, "workoutSessions", session.id), { exercises: nextExercises });
+    }
+    return nextExercises;
+  },
+  // "Pular hoje" só afeta a sessão ativa; a ficha original nunca é tocada. Séries completed
+  // nunca são apagadas nem marcadas skipped — applyExerciseSkip só toca as pendentes.
+  skipExercise: async (session: WorkoutSession, exerciseIndex: number, reasonCode?: string, reasonText?: string): Promise<WorkoutSession["exercises"]> => {
+    const updated = applyExerciseSkip(session.exercises[exerciseIndex], reasonCode, reasonText);
+    const nextExercises = session.exercises.map((item, index) => index === exerciseIndex ? updated : item);
+    await updateDoc(doc(db, "workoutSessions", session.id), { exercises: nextExercises });
+    return nextExercises;
+  },
+  undoSkipExercise: async (session: WorkoutSession, exerciseIndex: number): Promise<WorkoutSession["exercises"]> => {
+    const updated = undoExerciseSkip(session.exercises[exerciseIndex]);
+    const nextExercises = session.exercises.map((item, index) => index === exerciseIndex ? updated : item);
+    await updateDoc(doc(db, "workoutSessions", session.id), { exercises: nextExercises });
+    return nextExercises;
+  },
 };

@@ -2,25 +2,26 @@
 XTRAINER — DOCUMENTAÇÃO TÉCNICA, FUNCIONAL E OPERACIONAL COMPLETA
 ================================================================================
 
-Versão: 3.0
+Versão: 4.0
 Data: 22/08/2026
 Projetos: XTrainer e XTrainer-Admin
 Firebase compartilhado: xtrainer-45f8d
-Estado documentado: código-fonte do repositório XTrainer após a remoção de fotos/Storage,
-a fila de sincronização offline revisada, a exportação de histórico e a integração do
-Claude Code via GitHub Actions.
+Estado documentado: código-fonte dos dois repositórios após tema claro/escuro, memória de
+carga por série, calendário de treinos, troca de exercício com escopo (sessão/definitiva),
+pular exercício, alternativas preferidas, feedback tátil/sonoro do cronômetro, tela sempre
+ativa e resumos mensal/anual (Wrapped).
 
-Este documento substitui a versão 2.0 (18/08/2026) para o repositório XTrainer. Todo o
-conteúdo relativo ao XTrainer foi reverificado diretamente no código-fonte nesta sessão
-(build, lint, typecheck e testes executados com sucesso). O conteúdo relativo ao
-XTrainer-Admin foi mantido a partir da versão anterior por não ter sido tocado nesta
-sessão — está claramente identificado onde isso se aplica. README.md, FIRESTORE_SCHEMA.md,
-CONTRATO_COMPARTILHADO.md, CHECKLIST_FUNCIONAL.md, MAPA_DO_SISTEMA.md,
-PENDENCIAS_E_MELHORIAS.md e RELATORIO_IMPLEMENTACAO_METODOS.md são documentos
-operacionais complementares mantidos junto do código; a fonte definitiva é sempre o
-código dos dois repositórios.
+Este documento substitui a versão 3.0 (22/08/2026, mais cedo) para os dois repositórios.
+Todo o conteúdo foi reverificado diretamente no código-fonte nesta sessão (lint, typecheck,
+testes unitários, testes de regras do Firestore, verificador de contrato e build executados
+com sucesso nos dois projetos). README.md, FIRESTORE_SCHEMA.md, CONTRATO_COMPARTILHADO.md,
+CHECKLIST_FUNCIONAL.md, MAPA_DO_SISTEMA.md, PENDENCIAS_E_MELHORIAS.md e
+RELATORIO_IMPLEMENTACAO_METODOS.md são documentos operacionais complementares mantidos
+junto do código; a fonte definitiva é sempre o código dos dois repositórios.
 
-A seção 32 lista, de forma objetiva, tudo que mudou desde a versão 2.0.
+A seção 32 lista o changelog até a versão 3.0. A seção 34 detalha tudo que mudou na
+versão 4.0: troca de exercício com escopo, identidade real de séries, pular exercício,
+alternativas preferidas, feedback tátil/sonoro, tela sempre ativa e resumos.
 
 ================================================================================
 1. OBJETIVO DO PRODUTO
@@ -1224,6 +1225,145 @@ documentação e agora, em ordem cronológica aproximada:
 17. Campo de data de nascimento do perfil trocado de calendário nativo para três
     seletores Dia/Mês/Ano, eliminando a necessidade de navegar mês a mês até achar o
     ano de nascimento.
+
+================================================================================
+33. TEMA CLARO/ESCURO, MEMÓRIA DE CARGA E CALENDÁRIO (22/08/2026, sessão anterior)
+================================================================================
+
+Tema claro/escuro: paleta convertida para variáveis CSS (:root com padrão escuro e
+:root[data-theme="light"] com a paleta clara), alternador (src/components/theme-toggle.tsx)
+persistido em localStorage ("xtrainer-theme"), detecção inicial por prefers-color-scheme e
+script inline no <head> para aplicar o tema antes da hidratação (evita flash/erro de
+hidratação — o componente sempre renderiza "dark" no primeiro paint e sincroniza depois via
+useEffect). Botão no menu lateral, no topo mobile e na tela de login.
+
+Memória de carga por série: ao iniciar uma sessão, cada posição de série (bloco) é
+pré-preenchida com a última carga realmente usada naquela posição na sessão concluída mais
+recente do exercício (lastUsedLoadsByBlock em src/lib/training-analytics.ts), em vez de
+sempre voltar para a carga sugerida do treino. createTrainingSets aceita esse array de
+cargas lembradas como parâmetro opcional.
+
+Calendário de treinos: clicar na data do cabeçalho do painel (agora um botão) abre
+src/components/training-calendar.tsx, um calendário do mês com os dias de treino concluído
+marcados, navegação entre meses e carregamento sob demanda via
+sessions.listCompletedBetween.
+
+================================================================================
+34. TROCA/PULAR EXERCÍCIO, PREFERÊNCIAS, ALERTAS, WAKE LOCK E RESUMOS (22/08/2026)
+================================================================================
+
+Objetivo: dar mais controle durante a execução do treino (trocar ou pular um exercício sem
+comprometer o histórico) e fechar o ciclo com analytics agregados (resumo mensal, Wrapped
+anual), sem nunca reescrever o que já foi realmente executado.
+
+--- 34.1 TROCA DE EXERCÍCIO COM ESCOPO ---
+
+Reaproveita o seletor existente (exercise-swap-picker.tsx); a novidade é o ESCOPO da troca,
+perguntado depois de escolher o substituto (src/components/training/
+exercise-swap-scope-modal.tsx):
+
+- SÓ NESTA SESSÃO: altera somente o WorkoutSession ativo. O Workout salvo não muda; na
+  próxima execução o exercício original volta.
+- ALTERAR TREINO DEFINITIVAMENTE: exige uma segunda confirmação explícita ("Essa alteração
+  também será usada nas próximas execuções deste treino") e altera Workout + WorkoutSession
+  em uma única writeBatch (sessions.swapExercise em src/services/data.ts), evitando o estado
+  inconsistente de só um dos dois documentos ser atualizado.
+
+Identidade real de série (golden rule): TrainingSet ganhou actualExerciseId?/
+actualExerciseName? opcionais. Ao trocar um exercício (applyExerciseSwap em
+src/lib/training-methods.ts), toda série já completed é carimbada com a identidade que
+REALMENTE executou antes do SessionExercise passar a apontar para o substituto; séries
+pendentes não recebem o carimbo e passam a representar o novo exercício naturalmente.
+SessionExercise ganhou originalExerciseId?/originalExerciseName? (gravado só na primeira
+troca, preservado em trocas seguintes), substitutionType? ("session-only"|"permanent") e
+substitutedAt?. aggregateExerciseSession (src/lib/training-analytics.ts) foi reescrita para
+agrupar as séries de um mesmo SessionExercise por identidade real
+(actualExerciseId ?? SessionExercise.exerciseId), podendo gerar duas entradas de analytics
+para o mesmo exercício-slot quando houve troca no meio da execução — carga, volume,
+histórico e recordes sempre pertencem a quem realmente foi executado.
+
+Descanso de grupo (bi-set/tri-set/...) após troca/pulo: groupRoundRestOverride recalcula
+dinamicamente se a rodada terminou considerando membros pulados, corrigindo o caso em que a
+posição "última do grupo" muda porque esse membro foi pulado.
+
+--- 34.2 PULAR EXERCÍCIO APENAS HOJE ---
+
+SessionExercise ganhou skipInfo? ({skipped, reasonCode?, reasonText?, skippedAt?});
+TrainingSet ganhou skipped?. applyExerciseSkip só marca as séries PENDENTES como skipped;
+séries já completed nunca são tocadas. undoExerciseSkip restaura tudo. Skipped nunca conta
+volume, série efetiva ou recorde (completed e skipped nunca coexistem no mesmo set).
+Funciona por membro individual dentro de um grupo (ex.: A1 pulado, A2 continua executável).
+Serviços: sessions.skipExercise / sessions.undoSkipExercise.
+
+--- 34.3 ALTERNATIVAS PREFERIDAS ---
+
+Nova collection privada exerciseSubstitutionPreferences ({ownerId, exerciseId,
+alternativeExerciseIds[]}) — informação pessoal, nunca gravada no catálogo global
+`exercises`. O seletor de troca mostra "ALTERNATIVAS PREFERIDAS" (com estrela) antes de
+"TODOS OS EXERCÍCIOS"; cada resultado da lista completa tem um botão de estrela para
+adicionar/remover. Regras puras (src/lib/exercise-preferences.ts): não permite o próprio
+exercício como alternativa de si mesmo, não permite duplicados, ordem preservada
+(reordenação para cima/baixo). Substituto desativado depois preserva a referência salva mas
+não é sugerido em novas trocas.
+
+--- 34.4 SOM, VIBRAÇÃO E TELA SEMPRE ATIVA ---
+
+Preferências locais versionadas (localStorage "xtrainer:training-preferences:v1"):
+soundEnabled, vibrationEnabled, wakeLockEnabled, countdownAlertEnabled — com JSON inválido
+sempre caindo em padrões seguros. Painel "PREFERÊNCIAS DO TREINO" com botão "TESTAR ALERTA".
+
+Som sintetizado via Web Audio API (sem arquivo remoto/CDN), ativado após interação legítima
+do usuário (clique em "Iniciar treino"). Vibração via navigator.vibrate quando suportado,
+sem erro quando não. Dedupe determinístico (nextRestAlertKey em src/lib/training-alerts.ts,
+testável sem Web Audio): o alerta final dispara uma única vez por restEndsAt, mesmo com
+múltiplos renders/timers. Aviso opcional nos últimos 3 segundos do descanso.
+
+Tela sempre ativa via Screen Wake Lock API, extraída em useScreenWakeLock
+(src/hooks/use-screen-wake-lock.ts): readquire automaticamente quando a aba volta a ficar
+visível, libera ao finalizar/cancelar sessão ou desativar a preferência, nunca ativa fora de
+uma sessão de treino ativa (dashboard/histórico/perfil/evolução não usam o hook). Sem
+suporte no navegador, não gera erro; a preferência fica desabilitada com aviso.
+
+--- 34.5 RESUMO MENSAL E WRAPPED ANUAL ---
+
+Novo módulo de analytics centralizado (src/lib/training-summaries.ts), complementar a
+training-analytics.ts, reaproveitando aggregateExerciseSession/calculateExerciseHistory:
+
+- calculateExerciseUsage, calculateMuscleGroupDistribution (por séries efetivas, nunca
+  volume em kg), calculateMethodUsage (uma ocorrência por SessionExercise com série efetiva,
+  não por estágio — um drop-set com 3 drops conta como 1 uso);
+- buildRecordTimeline: timeline determinística de PRs processando sessões em ordem
+  cronológica, nunca duplicando o mesmo recorde; o primeiro registro de um exercício sempre
+  conta como recorde de carga, reps/volume só a partir do segundo (mesmo critério já usado
+  ao finalizar treino);
+- calculateExerciseProgression/findBiggestAbsoluteGain/findBiggestPercentageGain: evolução
+  de carga dentro de um período (primeiro vs. último registro efetivo do período) —
+  deliberadamente diferente de PR (recorde histórico absoluto);
+- calculatePeriodWeightChange (exige ao menos dois registros de peso no período) e
+  calculatePeriodTrainingDuration;
+- calculateMonthlySummary/calculateYearlySummary compõem tudo isso, incluindo comparação de
+  volume/frequência com o período anterior ((atual-anterior)/anterior*100, null se
+  anterior=0, nunca divisão por zero).
+
+Para o recorde ser um PR de verdade (não só o máximo dentro do mês/ano), a timeline é
+construída sobre TODO o histórico até o fim do período (recordBaselineSessions), e só os
+eventos dentro do período são exibidos — nunca sobre uma janela artificialmente limitada.
+
+Rota /resumos (src/app/resumos/page.tsx), com ?tab=mensal&month=AAAA-MM e
+?tab=anual&year=AAAA sincronizados via history.replaceState (compartilhável). Busca todo o
+histórico concluído do usuário uma vez (sessions.listAllCompleted, já usado em outras telas)
+e deriva os resumos em memória via useMemo — nada é persistido como monthlyStats/
+yearlyStats. Card "SEU MÊS" no dashboard (aproximação leve com as últimas 100 sessões já
+carregadas, o cálculo exato fica em /resumos). Wrapped anual em slides navegáveis com
+"COMEÇAR"/"VER DETALHES" e botão "COMPARTILHAR RESUMO" (Web Share API com fallback para
+copiar para a área de transferência).
+
+--- 34.6 CONTRATO COMPARTILHADO ---
+
+types/index.ts, firestore.rules e a nova collection exerciseSubstitutionPreferences (regra
+owner-only, sem acesso do admin, sem índice composto — única query filtra por ownerId) foram
+sincronizados nos dois repositórios. Nenhuma migração de dados existente foi necessária:
+todos os campos novos são opcionais.
 
 ================================================================================
 FIM DA DOCUMENTAÇÃO

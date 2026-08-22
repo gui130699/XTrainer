@@ -1,5 +1,6 @@
+import { Timestamp } from "firebase/firestore";
 import { DEFAULT_TRAINING_METHODS } from "@/data/default-training-methods";
-import type { TrainingMethod, TrainingMethodCategory, TrainingMethodConfig, TrainingMethodConfigField, TrainingMethodConfigValue, TrainingMethodEngine, TrainingMethodSnapshot, TrainingSet, TrainingTempo, Workout, WorkoutExercise } from "@/types";
+import type { SessionExercise, SubstitutionType, TrainingMethod, TrainingMethodCategory, TrainingMethodConfig, TrainingMethodConfigField, TrainingMethodConfigValue, TrainingMethodEngine, TrainingMethodSnapshot, TrainingSet, TrainingTempo, Workout, WorkoutExercise, WorkoutExerciseGroup, WorkoutSession } from "@/types";
 
 export const TRAINING_METHOD_CATEGORY_LABELS: Record<TrainingMethodCategory, string> = { traditional: "Tradicional", warmup: "Aquecimento", group: "Combinados", intensity: "Intensidade", progression: "Progressão", tempo: "Cadência", failure: "Falha", time: "Tempo", advanced: "Avançado" };
 export const TRAINING_METHOD_ENGINE_LABELS: Record<TrainingMethodEngine, string> = { normal: "Séries normais", group: "Grupo", drop: "Drop-set", "rest-pause": "Rest-pause", cluster: "Cluster", progression: "Progressão", "top-backoff": "Top/back-off", tempo: "Tempo", failure: "Falha", amrap: "AMRAP", isometric: "Isometria", partials: "Parciais", "myo-reps": "Myo-reps", time: "Por tempo" };
@@ -147,3 +148,66 @@ export function trainingStageLabel(set: TrainingSet) {
 }
 
 export function isWorkingSet(set: TrainingSet) { return set.setRole !== "warmup" && set.setRole !== "ramp"; }
+
+// Troca de exercício durante a sessão. Séries já concluídas são congeladas com a identidade que
+// realmente executaram (actualExerciseId/actualExerciseName) antes do SessionExercise apontar
+// para o substituto; séries ainda pendentes não recebem esse carimbo e passam a representar o
+// novo exercício naturalmente, herdando a identidade atual do SessionExercise. originalExerciseId
+// só é gravado na primeira troca, preservando o exercício planejado original mesmo após trocas
+// sucessivas.
+export function applyExerciseSwap(exercise: SessionExercise, replacement: { id: string; name: string }, scope: SubstitutionType): SessionExercise {
+  return {
+    ...exercise,
+    originalExerciseId: exercise.originalExerciseId ?? exercise.exerciseId,
+    originalExerciseName: exercise.originalExerciseName ?? exercise.name,
+    exerciseId: replacement.id,
+    name: replacement.name,
+    substitutionType: scope,
+    substitutedAt: Timestamp.now(),
+    sets: exercise.sets.map((set) => set.completed ? { ...set, actualExerciseId: set.actualExerciseId ?? exercise.exerciseId, actualExerciseName: set.actualExerciseName ?? exercise.name } : set),
+  };
+}
+
+// Pular hoje: séries já concluídas nunca são tocadas. Só as pendentes viram "skipped" — nunca
+// entram em volume, séries efetivas ou recordes (aggregateExerciseSession já as ignora porque
+// nunca ficam completed).
+export function applyExerciseSkip(exercise: SessionExercise, reasonCode?: string, reasonText?: string): SessionExercise {
+  return {
+    ...exercise,
+    skipInfo: { skipped: true, reasonCode, reasonText, skippedAt: Timestamp.now() },
+    sets: exercise.sets.map((set) => set.completed ? set : { ...set, skipped: true }),
+  };
+}
+
+export function undoExerciseSkip(exercise: SessionExercise): SessionExercise {
+  return { ...exercise, skipInfo: undefined, sets: exercise.sets.map((set) => ({ ...set, skipped: undefined })) };
+}
+
+// Determina o descanso correto ao concluir uma série de um exercício agrupado (bi-set, tri-set
+// etc.), considerando membros pulados. O valor pré-calculado em cada série (restAfterSeconds)
+// assume que todo mundo participa; se um membro for pulado, a posição "última do grupo" pode
+// mudar. Retorna null quando o valor pré-calculado da série já está correto (uso normal, sem
+// pulos, ou rodada ainda não terminou) e um número quando é preciso sobrescrever porque a rodada
+// só terminou agora, considerando os pulos.
+export function groupRoundRestOverride(session: WorkoutSession, exercise: SessionExercise, round: number): number | null {
+  const groupId = exercise.target.groupId;
+  if (!groupId) return null;
+  const group = session.exerciseGroups?.find((item) => item.id === groupId);
+  if (!group) return null;
+  const members = group.exerciseIds.map((id) => session.exercises.find((item) => item.id === id)).filter((item): item is SessionExercise => Boolean(item));
+  const executable = members.filter((member) => !member.skipInfo?.skipped);
+  if (!executable.length) return 0;
+  const roundDone = executable.every((member) => { const set = member.sets[round]; return !set || set.completed || set.skipped; });
+  if (!roundDone) return null;
+  const values = methodValues(group.methodSnapshot, group.methodConfig);
+  return typeof values.restAfterRound === "number" ? Math.max(0, values.restAfterRound) : null;
+}
+
+// Um exercício de grupo é considerado concluído quando todos os membros executáveis (não
+// pulados) terminaram todas as suas séries planejadas, ou quando o grupo inteiro foi pulado.
+export function isGroupSessionComplete(session: WorkoutSession, group: WorkoutExerciseGroup): boolean {
+  const members = group.exerciseIds.map((id) => session.exercises.find((item) => item.id === id)).filter((item): item is SessionExercise => Boolean(item));
+  const executable = members.filter((member) => !member.skipInfo?.skipped);
+  if (!executable.length) return true;
+  return executable.every((member) => member.sets.length > 0 && member.sets.every((set) => set.completed || set.skipped));
+}

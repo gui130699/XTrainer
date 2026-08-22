@@ -1,32 +1,57 @@
 "use client";
-import { Check, ChevronUp, ExternalLink, Pencil, Plus, Repeat } from "lucide-react";
+import { Check, ChevronUp, ExternalLink, Pencil, Plus, Repeat, SkipForward, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { Button, Card } from "@/components/ui";
 import { trainingStageLabel } from "@/lib/training-methods";
 import { ExerciseSwapPicker } from "@/components/training-methods/exercise-swap-picker";
 import type { Exercise, SessionExercise, TrainingSet } from "@/types";
 
-export function TrainingMethodExecution({ exercise, exerciseIndex, library, onChange, onComplete, onAdd, onRemove, onSwap, onSync }: { exercise: SessionExercise; exerciseIndex: number; library: Exercise[]; onChange: (exerciseIndex: number, setIndex: number, data: Partial<TrainingSet>) => void; onComplete: (exerciseIndex: number, setIndex: number, completed: boolean) => void; onAdd: (exerciseIndex: number) => void; onRemove: (exerciseIndex: number, setIndex: number) => void; onSwap: (exerciseIndex: number, exercise: Exercise) => void; onSync: () => void }) {
+export function TrainingMethodExecution({ exercise, exerciseIndex, library, preferredIds, onChange, onComplete, onAdd, onRemove, onPickReplacement, onTogglePreferred, onSkip, onUndoSkip, onSync }: {
+  exercise: SessionExercise;
+  exerciseIndex: number;
+  library: Exercise[];
+  preferredIds: string[];
+  onChange: (exerciseIndex: number, setIndex: number, data: Partial<TrainingSet>) => void;
+  onComplete: (exerciseIndex: number, setIndex: number, completed: boolean) => void;
+  onAdd: (exerciseIndex: number) => void;
+  onRemove: (exerciseIndex: number, setIndex: number) => void;
+  onPickReplacement: (exerciseIndex: number, exercise: Exercise) => void;
+  onTogglePreferred: (exerciseId: string, candidateId: string) => void;
+  onSkip: (exerciseIndex: number) => void;
+  onUndoSkip: (exerciseIndex: number) => void;
+  onSync: () => void;
+}) {
   const method = exercise.target.methodSnapshot;
   const [swapping, setSwapping] = useState(false);
-  const allCompleted = exercise.sets.length > 0 && exercise.sets.every((item) => item.completed);
+  const skipped = exercise.skipInfo?.skipped === true;
+  const allCompleted = !skipped && exercise.sets.length > 0 && exercise.sets.every((item) => item.completed);
   const [collapsed, setCollapsed] = useState(false);
   const [prevAllCompleted, setPrevAllCompleted] = useState(allCompleted);
   if (allCompleted !== prevAllCompleted) { setPrevAllCompleted(allCompleted); if (allCompleted) setCollapsed(true); }
   const videoUrl = library.find((item) => item.id === exercise.exerciseId)?.videoUrl;
 
-  return <Card className={`exercise method-execution ${collapsed ? "is-collapsed" : ""}`}>
+  return <Card className={`exercise method-execution ${collapsed ? "is-collapsed" : ""} ${skipped ? "is-skipped" : ""}`}>
     <div className="method-execution-title">
-      <div><h2>{exercise.name}</h2><span className="method-chip">{method?.name ?? "Séries normais"}{exercise.target.groupId ? ` · posição ${(exercise.target.groupPosition ?? 0) + 1}` : ""}</span></div>
-      <div className="exercise-tools">
+      <div><h2>{exercise.name}
+        {exercise.substitutionType === "session-only" && <span className="status-badge is-session-only">Só nesta sessão</span>}
+        {skipped && <span className="status-badge is-skipped">Pulado hoje</span>}
+      </h2>
+        {exercise.originalExerciseId && exercise.originalExerciseId !== exercise.exerciseId && <p className="exercise-original-note">Original: {exercise.originalExerciseName}</p>}
+        <span className="method-chip">{method?.name ?? "Séries normais"}{exercise.target.groupId ? ` · posição ${(exercise.target.groupPosition ?? 0) + 1}` : ""}</span>
+      </div>
+      {!skipped && <div className="exercise-tools">
         {videoUrl && <a className="video-link" href={videoUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={15}/> Vídeo</a>}
         <button type="button" className="text-button" onClick={() => setSwapping(true)}><Repeat size={15}/> Trocar</button>
+        <button type="button" className="text-button" onClick={() => onSkip(exerciseIndex)}><SkipForward size={15}/> Pular hoje</button>
         {allCompleted && !collapsed && <button type="button" className="text-button" onClick={() => setCollapsed(true)}><ChevronUp size={15}/> Recolher</button>}
-      </div>
+      </div>}
     </div>
     <p>{exercise.target.repsMin}–{exercise.target.repsMax} repetições · descanso {exercise.target.restSeconds}s</p>
 
-    {collapsed ? <div className="draft-collapsed-summary">
+    {skipped ? <div className="skip-undo-row">
+      <small>{exercise.skipInfo?.reasonText ? `Motivo: ${exercise.skipInfo.reasonText}` : exercise.skipInfo?.reasonCode ? "Motivo informado" : "Sem motivo informado"}</small>
+      <button type="button" className="text-button" onClick={() => onUndoSkip(exerciseIndex)}><Undo2 size={15}/> Desfazer pulo</button>
+    </div> : collapsed ? <div className="draft-collapsed-summary">
       <div className="draft-summary-chips">
         <span className="draft-method-chip">{method?.name ?? "Séries normais"}</span>
         <span><b>{exercise.sets.filter((item) => item.completed).length}</b> séries concluídas</span>
@@ -51,6 +76,6 @@ export function TrainingMethodExecution({ exercise, exerciseIndex, library, onCh
       <button className="text-button" onClick={() => onAdd(exerciseIndex)}><Plus size={16}/> Adicionar série normal</button>
     </>}
 
-    {swapping && <ExerciseSwapPicker library={library} excludeId={exercise.exerciseId} onSelect={(item) => { onSwap(exerciseIndex, item); setSwapping(false); }} onClose={() => setSwapping(false)}/>}
+    {swapping && <ExerciseSwapPicker library={library} excludeId={exercise.exerciseId} preferredIds={preferredIds} onSelect={(item) => { onPickReplacement(exerciseIndex, item); setSwapping(false); }} onTogglePreferred={(candidateId) => onTogglePreferred(exercise.exerciseId, candidateId)} onClose={() => setSwapping(false)}/>}
   </Card>;
 }

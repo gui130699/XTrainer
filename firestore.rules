@@ -186,6 +186,21 @@ service cloud.firestore {
       allow delete: if ownsExisting();
     }
 
+    function validExerciseSubstitutionPreference(data) {
+      return data.keys().hasAll(['ownerId', 'exerciseId', 'alternativeExerciseIds'])
+        && data.keys().hasOnly(['ownerId', 'exerciseId', 'alternativeExerciseIds', 'createdAt', 'updatedAt'])
+        && data.ownerId is string
+        && data.exerciseId is string
+        && data.alternativeExerciseIds is list;
+    }
+
+    match /exerciseSubstitutionPreferences/{id} {
+      allow read: if ownsExisting();
+      allow create: if createsForSelf() && validExerciseSubstitutionPreference(request.resource.data);
+      allow update: if ownsExisting() && preservesOwner() && validExerciseSubstitutionPreference(request.resource.data);
+      allow delete: if ownsExisting();
+    }
+
     match /auditLogs/{id} {
       allow read: if isAdmin();
       allow create: if isAdmin()

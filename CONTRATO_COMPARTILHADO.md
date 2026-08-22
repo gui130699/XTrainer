@@ -6,9 +6,11 @@ O Firebase é único (`xtrainer-45f8d`). O XTrainer Admin é a referência opera
 
 - `firestore.rules`;
 - `firestore.indexes.json`;
-- `storage.rules`;
 - `src/types/index.ts`;
-- `src/data/default-exercises.ts`.
+- `src/data/default-exercises.ts`;
+- `src/data/default-training-methods.ts`.
+
+O projeto não usa Firebase Storage (fotos foram removidas); não existe `storage.rules` em nenhum dos dois repositórios, e o contrato não o compara.
 
 O comando `npm run check:firebase-contract` compara os repositórios locais. No CI, o workflow baixa o repositório irmão e bloqueia deploy quando existe drift.
 
@@ -18,9 +20,10 @@ XTrainer:
 
 - cadastra usuários comuns;
 - mantém perfil e todos os dados privados do owner;
-- cria treinos e executa sessões;
+- cria treinos e executa sessões, incluindo troca de exercício (temporária ou definitiva) e pular exercício apenas na sessão do dia;
+- mantém as alternativas de troca preferidas do próprio usuário (`exerciseSubstitutionPreferences`), sem tocar no catálogo global;
 - registra evolução corporal;
-- deriva analytics de sessões concluídas.
+- deriva analytics de sessões concluídas, incluindo resumos mensais/anuais.
 
 XTrainer Admin:
 
@@ -28,7 +31,7 @@ XTrainer Admin:
 - lista identificação mínima de contas;
 - cria, edita, ativa/desativa, importa e exporta exercícios;
 - grava audit logs;
-- não consulta dados privados do usuário.
+- não consulta dados privados do usuário, incluindo `exerciseSubstitutionPreferences`.
 
 Firebase/ambiente confiável:
 
@@ -43,12 +46,12 @@ Firebase/ambiente confiável:
 2. Novo usuário sempre começa como `role: user`.
 3. Admin é `request.auth.uid == system/config.adminUid`.
 4. `ownerId` não pode mudar.
-5. Admin não lê/grava workouts, sessions, weights ou assessments.
-6. Fotos só podem ser acessadas pelo UID dono.
-7. Coleção não declarada é negada.
-8. Audit log é imutável.
-9. Sessão ativa só pode usar `active-{uid}`.
-10. Sessão histórica nunca volta a ativa.
+5. Admin não lê/grava workouts, sessions, weights, assessments ou exerciseSubstitutionPreferences.
+6. Coleção não declarada é negada.
+7. Audit log é imutável.
+8. Sessão ativa só pode usar `active-{uid}`.
+9. Sessão histórica nunca volta a ativa.
+10. Histórico representa o que realmente aconteceu: uma série `completed` nunca é reatribuída a outro exercício por causa de uma troca posterior, e nunca é apagada por causa de um "pular hoje" (ver seção Contrato de sessão e analytics).
 
 ## Contrato de catálogo
 
@@ -67,9 +70,10 @@ Firebase/ambiente confiável:
 - inputs alteram estado local e sincronizam em eventos relevantes, não a cada tecla;
 - descanso usa `restEndsAt`, não contador volátil;
 - volume = soma de carga × repetições em sets concluídos;
-- analytics usa somente sessões concluídas e agrupa por `exerciseId`;
+- analytics usa somente sessões concluídas e agrupa pela identidade real de cada série (`TrainingSet.actualExerciseId ?? SessionExercise.exerciseId`), nunca apenas pelo exercício que estava planejado na ficha — uma troca no meio da execução pode deixar duas identidades dentro do mesmo `SessionExercise`, e cada série concluída antes da troca preserva a identidade que realmente executou;
+- séries `skipped` (pular hoje) nunca entram em volume, séries efetivas ou recordes; séries já `completed` nunca são apagadas ou marcadas skipped;
 - nome normalizado só é fallback para snapshots legados sem ID;
-- recordes não são gravados manualmente em coleção paralela.
+- recordes não são gravados manualmente em coleção paralela — nem os de sessão finalizada, nem a timeline usada em resumos mensais/anuais.
 
 ## Evolução de schema
 
@@ -91,7 +95,7 @@ GitHub Pages e Firebase têm ciclos diferentes. Um build/deploy do frontend não
 
 1. validar os dois projetos;
 2. revisar diff do contrato;
-3. publicar Rules/índices/Storage manualmente no projeto correto;
+3. publicar Rules/índices manualmente no projeto correto;
 4. acompanhar Console/Logs;
 5. publicar os PWAs;
 6. fazer smoke test de usuário e admin.
@@ -105,5 +109,5 @@ npm run check:firebase-contract
 Comando de publicação, somente após revisão:
 
 ```bash
-firebase deploy --only firestore:rules,firestore:indexes,storage --project xtrainer-45f8d
+firebase deploy --only firestore:rules,firestore:indexes --project xtrainer-45f8d
 ```
