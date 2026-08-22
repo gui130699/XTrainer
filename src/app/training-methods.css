@@ -4,4 +4,17 @@
 .group-round h3{color:#a5f3fc;font-size:14px}
 .group-round .method-stage>b{min-width:150px}
 .method-history-stage>b{min-width:95px;color:#dce8f4}
-@media(max-width:700px){.group-round .method-stage>b{width:100%}}
+.method-execution-title{align-items:flex-start}
+.exercise-tools{display:flex;align-items:center;gap:12px;flex:none;white-space:nowrap}
+.method-execution.is-collapsed,.group-execution.is-collapsed{background:linear-gradient(135deg,#0b1725,#0b2131)}
+.group-members-header{display:grid;gap:8px;margin:14px 0}
+.group-member-tools{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid #25364a;border-radius:10px;background:#07111f}
+.group-member-tools>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#dce8f4;font-weight:800}
+.swap-filters{grid-template-columns:1fr}
+@media(max-width:700px){
+  .group-round .method-stage>b{width:100%}
+  .method-execution-title{flex-wrap:wrap;gap:8px}
+  .exercise-tools{width:100%;justify-content:flex-start}
+  .group-member-tools{flex-wrap:wrap}
+  .group-member-tools>span{width:100%}
+}
