@@ -14,7 +14,7 @@ import { dataErrorMessage, exerciseMuscleGroups, normalizeSearchText } from "@/l
 import { exercises, sessions, workouts } from "@/services/data";
 import { trainingMethodsService } from "@/services/training-methods";
 import type { Exercise, SyncStatus, TrainingMethod, TrainingSet, Workout, WorkoutExercise, WorkoutExerciseGroup, WorkoutSession } from "@/types";
-import { Archive, Check, ChevronDown, Copy, ExternalLink, Pencil, Play, Plus, Search, Timer } from "lucide-react";
+import { Archive, Check, ChevronDown, Copy, ExternalLink, History, Pencil, Play, Plus, Search, Timer } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -58,23 +58,30 @@ function Work() {
   const [loadError, setLoadError] = useState("");
   const [clock, setClock] = useState(() => Date.now());
   const [summary, setSummary] = useState<TrainingSummary | null>(null);
+  const [completedCounts, setCompletedCounts] = useState<Map<string, number>>(new Map());
 
   const load = useCallback(async () => {
     if (!uid) return;
     setLoading(true);
     setLoadError("");
     try {
-      const [plansResult, activeResult, libraryResult, methodsResult] = await Promise.allSettled([
+      const [plansResult, activeResult, libraryResult, methodsResult, completedResult] = await Promise.allSettled([
         workouts.list(uid),
         sessions.getActive(uid),
         exercises.list(),
         trainingMethodsService.list(),
+        sessions.listAllCompleted(uid),
       ]);
 
       if (plansResult.status === "fulfilled") setPlans(plansResult.value);
       if (activeResult.status === "fulfilled") setActive(activeResult.value);
       if (libraryResult.status === "fulfilled") setLibrary(libraryResult.value);
       setMethods(methodsResult.status === "fulfilled" && methodsResult.value.length ? methodsResult.value : [normalTrainingMethod()]);
+      if (completedResult.status === "fulfilled") {
+        const counts = new Map<string, number>();
+        for (const completedSession of completedResult.value) counts.set(completedSession.workoutId, (counts.get(completedSession.workoutId) ?? 0) + 1);
+        setCompletedCounts(counts);
+      }
 
       const requiredFailure = [plansResult, libraryResult].find((result) => result.status === "rejected");
       if (requiredFailure?.status === "rejected") {
@@ -385,7 +392,7 @@ function Work() {
   return <AppShell><header><p className="eyebrow">SESSÃO</p><h1>Qual treino vamos fazer?</h1><Button onClick={() => openBuilder()}><Plus size={16}/> NOVO TREINO</Button></header>
     {message && <p className={message.includes("sucesso") ? "success" : "error"} role="status">{message}</p>}
     {loadError && <ErrorState message={loadError} onRetry={() => void load()}/>} {loading && <Loading/>}
-    {!loading && active && <Card><span>TREINO EM ANDAMENTO</span><h2>{active.workoutName}</h2><p>Há uma sessão ativa salva. Resolva-a antes de iniciar outra.</p><Button onClick={() => { setSession(active); setClock(Date.now()); }}>RETOMAR</Button><button className="text-button" onClick={() => void cancel(active)} disabled={saving}>CANCELAR SESSÃO</button></Card>}
+    {!loading && active && <Card><span>TREINO EM ANDAMENTO</span><h2>{active.workoutName}</h2><p>Há uma sessão ativa salva. Resolva-a antes de iniciar outra.</p><div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}><Button onClick={() => { setSession(active); setClock(Date.now()); }}>RETOMAR</Button><Button className="outline" onClick={() => void cancel(active)} disabled={saving}>CANCELAR SESSÃO</Button></div></Card>}
     {methodTargetId && <MethodSelector methods={methods} currentId={draft.find((item) => item.id === methodTargetId)?.methodSnapshot?.id} onClose={() => setMethodTargetId(null)} onSelect={(method) => chooseMethod(methodTargetId, method)}/>}
     {!loading && builder !== undefined && <Card className="workout-builder-card"><div className="builder-title"><div><span>{builder ? "EDIÇÃO" : "NOVO TREINO"}</span><h2>{builder ? "Editar treino" : "Monte seu treino"}</h2><p>Adicione os exercícios e salve quando terminar.</p></div><button type="button" className="text-button" onClick={() => setBuilder(undefined)}>Fechar</button></div>
       {!library.length ? <div className="empty"><strong>Biblioteca ainda não foi importada.</strong><span>Peça ao administrador para importar a biblioteca no painel administrativo.</span>{admin && <Button onClick={() => void importLibrary()} disabled={importing}>{importing ? "IMPORTANDO..." : "IMPORTAR 202 EXERCÍCIOS"}</Button>}</div> : <form className="workout-builder" onSubmit={saveWorkout}>
@@ -434,7 +441,7 @@ function Work() {
       const exerciseListId = `workout-exercises-${workout.id}`;
       return <Card className={`workout-plan-card ${expanded ? "is-expanded" : ""}`} key={workout.id}>
         <button type="button" className="workout-plan-toggle" onClick={() => togglePlanExercises(workout.id)} aria-expanded={expanded} aria-controls={exerciseListId}>
-          <div className="workout-plan-header"><div><span className="workout-plan-label">TREINO ATIVO</span><h2>{workout.title}</h2></div><div className="workout-plan-count-group"><span className="workout-plan-count">{workout.exercises.length} {workout.exercises.length === 1 ? "exercício" : "exercícios"}</span><span className="workout-plan-chevron" aria-hidden="true"><ChevronDown size={20}/></span></div></div>
+          <div className="workout-plan-header"><div><span className="workout-plan-label">TREINO ATIVO</span><h2>{workout.title}</h2></div><div className="workout-plan-count-group">{Boolean(completedCounts.get(workout.id)) && <span className="workout-plan-count workout-plan-done-count"><History size={11}/> {completedCounts.get(workout.id)}x feito</span>}<span className="workout-plan-count">{workout.exercises.length} {workout.exercises.length === 1 ? "exercício" : "exercícios"}</span><span className="workout-plan-chevron" aria-hidden="true"><ChevronDown size={20}/></span></div></div>
           {workout.description && <p className="workout-plan-description">{workout.description}</p>}
         </button>
         {expanded && <section className="workout-exercise-list" id={exerciseListId} aria-label={`Exercícios de ${workout.title}`}>

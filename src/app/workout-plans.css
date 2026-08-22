@@ -82,6 +82,13 @@
   gap: 8px;
 }
 
+.workout-plan-done-count {
+  border-color: #16a34a66;
+  background: #14532d4d;
+  color: #86efac;
+  gap: 4px;
+}
+
 .workout-plan-chevron {
   width: 32px;
   height: 32px;

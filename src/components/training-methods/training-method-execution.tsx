@@ -1,5 +1,5 @@
 "use client";
-import { Check, ExternalLink, Pencil, Plus, Repeat } from "lucide-react";
+import { Check, ChevronUp, ExternalLink, Pencil, Plus, Repeat } from "lucide-react";
 import { useState } from "react";
 import { Button, Card } from "@/components/ui";
 import { trainingStageLabel } from "@/lib/training-methods";
@@ -21,6 +21,7 @@ export function TrainingMethodExecution({ exercise, exerciseIndex, library, onCh
       <div className="exercise-tools">
         {videoUrl && <a className="video-link" href={videoUrl} target="_blank" rel="noopener noreferrer"><ExternalLink size={15}/> Vídeo</a>}
         <button type="button" className="text-button" onClick={() => setSwapping(true)}><Repeat size={15}/> Trocar</button>
+        {allCompleted && !collapsed && <button type="button" className="text-button" onClick={() => setCollapsed(true)}><ChevronUp size={15}/> Recolher</button>}
       </div>
     </div>
     <p>{exercise.target.repsMin}–{exercise.target.repsMax} repetições · descanso {exercise.target.restSeconds}s</p>

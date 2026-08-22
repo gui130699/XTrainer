@@ -1,5 +1,5 @@
 "use client";
-import { Check, ExternalLink, Pencil, Repeat } from "lucide-react";
+import { Check, ChevronUp, ExternalLink, Pencil, Repeat } from "lucide-react";
 import { useState } from "react";
 import { Button, Card } from "@/components/ui";
 import { trainingStageLabel } from "@/lib/training-methods";
@@ -15,7 +15,7 @@ export function TrainingGroupExecution({ group, members, allExercises, library, 
   if (allCompleted !== prevAllCompleted) { setPrevAllCompleted(allCompleted); if (allCompleted) setCollapsed(true); }
 
   return <Card className={`group-execution ${collapsed ? "is-collapsed" : ""}`}>
-    <div className="method-execution-title"><div><p className="eyebrow">SEQUÊNCIA COMBINADA</p><h2>{group.name}</h2><span className="method-chip">{group.methodSnapshot.name}</span></div><p>{group.methodSnapshot.fullDescription}</p></div>
+    <div className="method-execution-title"><div><p className="eyebrow">SEQUÊNCIA COMBINADA</p><h2>{group.name}</h2><span className="method-chip">{group.methodSnapshot.name}</span></div><div><p>{group.methodSnapshot.fullDescription}</p>{allCompleted && !collapsed && <div className="exercise-tools"><button type="button" className="text-button" onClick={() => setCollapsed(true)}><ChevronUp size={15}/> Recolher</button></div>}</div></div>
 
     <div className="group-members-header">{members.map((exercise) => {
       const exerciseIndex = allExercises.findIndex((item) => item.id === exercise.id);
