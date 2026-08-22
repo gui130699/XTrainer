@@ -8,6 +8,7 @@ import {
   calculateMonthlyStats,
   calculateTrainingStreak,
   detectNewRecords,
+  lastUsedLoadsByBlock,
 } from "../src/lib/training-analytics";
 import type { TrainingSet, WorkoutSession } from "../src/types";
 
@@ -88,6 +89,27 @@ test("sequência semanal aceita a semana atual ou a imediatamente anterior", () 
   ];
   assert.equal(calculateTrainingStreak(sessions, new Date("2026-08-18T12:00:00Z")), 3);
   assert.equal(calculateTrainingStreak(sessions.slice(1), new Date("2026-08-18T12:00:00Z")), 2);
+});
+
+test("lastUsedLoadsByBlock lembra a carga de topo por posição de série na sessão concluída mais recente", () => {
+  const older = completedSession("s1", "2026-08-01", [
+    { load: 15, reps: 10, blockIndex: 0, stageIndex: 0 },
+    { load: 25, reps: 8, blockIndex: 1, stageIndex: 0 },
+  ]);
+  const latest = completedSession("s2", "2026-08-08", [
+    { load: 20, reps: 10, blockIndex: 0, stageIndex: 0 },
+    { load: 30, reps: 8, blockIndex: 1, stageIndex: 0 },
+  ]);
+  assert.deepEqual(lastUsedLoadsByBlock([latest, older], "supino"), [20, 30]);
+});
+
+test("lastUsedLoadsByBlock ignora etapas de drop/pause e sessões não concluídas", () => {
+  const session = completedSession("s1", "2026-08-01", [
+    { load: 40, reps: 10, blockIndex: 0, stageIndex: 0 },
+    { load: 30, reps: 8, blockIndex: 0, stageIndex: 1, setRole: "drop" },
+  ]);
+  assert.deepEqual(lastUsedLoadsByBlock([session], "supino"), [40]);
+  assert.deepEqual(lastUsedLoadsByBlock([], "supino"), []);
 });
 
 test("evolução não divide por zero", () => {

@@ -75,6 +75,7 @@ function Work() {
   const [clock, setClock] = useState(() => Date.now());
   const [summary, setSummary] = useState<TrainingSummary | null>(null);
   const [completedCounts, setCompletedCounts] = useState<Map<string, number>>(new Map());
+  const [history, setHistory] = useState<WorkoutSession[]>([]);
   const [notifyPermission, setNotifyPermission] = useState<NotificationPermission | "unsupported">(() => (typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported"));
   const prevRestSecondsRef = useRef(0);
 
@@ -99,6 +100,7 @@ function Work() {
         const counts = new Map<string, number>();
         for (const completedSession of completedResult.value) counts.set(completedSession.workoutId, (counts.get(completedSession.workoutId) ?? 0) + 1);
         setCompletedCounts(counts);
+        setHistory(completedResult.value);
       }
 
       const requiredFailure = [plansResult, libraryResult].find((result) => result.status === "rejected");
@@ -337,7 +339,7 @@ function Work() {
     setMessage("");
     setSaveError(false);
     try {
-      const created = await sessions.start(uid!, workout);
+      const created = await sessions.start(uid!, workout, history);
       setSession(created);
       setActive(created);
     } catch (error) {

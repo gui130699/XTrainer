@@ -6,7 +6,7 @@
   padding: 16px;
   border: 1px solid #0e7490;
   border-radius: 14px;
-  background: linear-gradient(135deg, #082f49cc, #07111f);
+  background: linear-gradient(135deg, #082f49cc, var(--bg));
 }
 
 .composition-result > div {
@@ -18,19 +18,19 @@
 }
 
 .composition-result span {
-  color: #a5f3fc;
+  color: var(--accent-text);
   font-size: 12px;
 }
 
 .composition-result strong {
-  color: #f4f8fb;
+  color: var(--text);
   font-size: 24px;
 }
 
 .composition-result p {
   grid-column: 1 / -1;
   margin: 2px 0 0;
-  color: #a8bacb;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -39,7 +39,7 @@
   border: 1px solid #7f1d1d;
   border-radius: 10px;
   background: #450a0a4d;
-  color: #fecaca;
+  color: var(--error-strong);
 }
 
 .assessment-form-actions {
@@ -49,9 +49,9 @@
   gap: 12px;
   margin-top: 4px;
   padding: 18px;
-  border: 1px solid #29455e;
+  border: 1px solid var(--border-strong);
   border-radius: 15px;
-  background: linear-gradient(135deg, #0d1b29, #0a1622);
+  background: linear-gradient(135deg, var(--bg-elevated), #0a1622);
 }
 
 .assessment-save-button,
@@ -78,13 +78,13 @@
   min-width: 125px;
   border: 1px solid #455d74;
   background: #111f2e;
-  color: #dce8f4;
+  color: var(--text-emphasis);
 }
 
 .assessment-cancel-button:hover {
   border-color: #6b8298;
-  background: #18283a;
-  color: #fff;
+  background: var(--bg-hover);
+  color: var(--text);
 }
 
 .assessment-cancel-button:focus-visible {
@@ -100,9 +100,9 @@
   gap: 24px;
   margin-bottom: 22px;
   padding: 16px 18px;
-  border: 1px solid #29455e;
+  border: 1px solid var(--border-strong);
   border-radius: 16px;
-  background: linear-gradient(135deg, #0d1b29, #0a1622);
+  background: linear-gradient(135deg, var(--bg-elevated), #0a1622);
   box-shadow: 0 10px 28px #02061733;
 }
 
@@ -119,7 +119,7 @@
 }
 
 .weight-period-filter > span {
-  color: #8fa3b8;
+  color: var(--text-muted);
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 1px;
@@ -128,7 +128,7 @@
 .weight-period-filter select {
   min-height: 48px;
   border-color: #3a536c;
-  background-color: #07111f;
+  background-color: var(--bg);
 }
 
 .history-row-actions {
@@ -159,7 +159,7 @@
 .history-action-button:hover {
   transform: translateY(-1px);
   border-color: #22d3ee;
-  background: #0b3558;
+  background: var(--bg-brand-panel);
   color: #e6fbff;
 }
 
@@ -171,7 +171,7 @@
 .history-action-button.danger {
   border-color: #713342;
   background: linear-gradient(145deg, #32151e, #21131a);
-  color: #fecaca;
+  color: var(--error-strong);
 }
 
 .history-action-button.danger:hover {

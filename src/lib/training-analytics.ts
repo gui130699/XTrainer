@@ -89,6 +89,21 @@ export function calculateExerciseHistory(sessions: WorkoutSession[], exerciseId:
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
+// Carga usada por posição de série (blockIndex) na sessão concluída mais recente deste
+// exercício. Usada para pré-preencher a próxima sessão com a última carga real, em vez de
+// reiniciar sempre da carga sugerida do treino. Retorna -1 nas posições sem histórico.
+export function lastUsedLoadsByBlock(sessions: WorkoutSession[], exerciseId: string, exerciseName?: string): number[] {
+  const latest = calculateExerciseHistory(sessions, exerciseId, exerciseName).at(-1);
+  if (!latest) return [];
+  const byBlock = new Map<number, number>();
+  for (const set of latest.sets) {
+    if (set.stageIndex !== 0) continue;
+    byBlock.set(set.blockIndex ?? 0, set.load);
+  }
+  if (!byBlock.size) return [];
+  return Array.from({ length: Math.max(...byBlock.keys()) + 1 }, (_, index) => byBlock.get(index) ?? -1);
+}
+
 export function calculateExerciseRecords(sessions: WorkoutSession[]) {
   const records = new Map<string, ExerciseRecord>();
   for (const aggregate of sessions.flatMap(aggregateExerciseSession).sort((a, b) => a.date.getTime() - b.date.getTime())) {

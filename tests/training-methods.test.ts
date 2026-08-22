@@ -81,6 +81,21 @@ test("métodos personalizados podem criar quad-set e drop configurável", () => 
   assert.equal(createTrainingSets(item, workout([item])).length, 4);
 });
 
+test("previousLoads sobrescreve a carga sugerida por posição de série, quando disponível", () => {
+  const item = exercise(byId("series-normais"));
+  item.sets = 3;
+  const sets = createTrainingSets(item, workout([item]), [20, 30]);
+  assert.deepEqual(sets.map((set) => set.load), [20, 30, 80]);
+});
+
+test("previousLoads também ajusta a carga de topo do drop-set, preservando as reduções", () => {
+  const item = exercise(byId("drop-set"));
+  item.sets = 1;
+  item.methodConfig = createMethodConfig(item.methodSnapshot!, { sets: 1, drops: 2, reductionPercent: 20 });
+  const stages = createTrainingSets(item, workout([item]), [100]);
+  assert.deepEqual(stages.map((set) => Math.round(set.load)), [100, 80, 64]);
+});
+
 test("aquecimento e aproximação são preservados, mas não contam como séries efetivas", () => {
   for (const id of ["aquecimento", "rampa"]) {
     const item = exercise(byId(id));

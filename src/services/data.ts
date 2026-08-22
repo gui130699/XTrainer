@@ -24,6 +24,7 @@ import { db } from "@/lib/firebase";
 import { DEFAULT_EXERCISES } from "@/data/default-exercises";
 import { normalizeSearchText } from "@/lib/utils";
 import { createTrainingSets, normalizeWorkoutMethod } from "@/lib/training-methods";
+import { lastUsedLoadsByBlock } from "@/lib/training-analytics";
 import {
   normalizeAssessmentDocument,
   normalizeBodyWeightDocument,
@@ -242,7 +243,7 @@ const sessionDocumentPayload = (session: Omit<WorkoutSession, "id"> | WorkoutSes
   notes: session.notes,
 });
 
-const createSessionFromWorkout = (uid: string, workout: Workout): Omit<WorkoutSession, "id"> => ({
+const createSessionFromWorkout = (uid: string, workout: Workout, history: WorkoutSession[]): Omit<WorkoutSession, "id"> => ({
   ownerId: uid,
   workoutId: workout.id,
   workoutName: workout.name,
@@ -257,7 +258,7 @@ const createSessionFromWorkout = (uid: string, workout: Workout): Omit<WorkoutSe
     name: exercise.name,
     order: exercise.order,
     target: normalizeWorkoutMethod(exercise),
-    sets: createTrainingSets(exercise, workout),
+    sets: createTrainingSets(exercise, workout, lastUsedLoadsByBlock(history, exercise.exerciseId, exercise.name)),
   })),
 });
 
@@ -340,10 +341,10 @@ export const sessions = {
     }
     return legacyDocuments.length ? migrateLegacyActive(uid, legacyDocuments) : null;
   },
-  start: async (uid: string, workout: Workout) => {
+  start: async (uid: string, workout: Workout, history: WorkoutSession[] = []) => {
     const id = activeSessionId(uid);
     const reference = doc(db, "workoutSessions", id);
-    const local = createSessionFromWorkout(uid, workout);
+    const local = createSessionFromWorkout(uid, workout, history);
     await runTransaction(db, async (transaction) => {
       const existing = await transaction.get(reference);
       if (existing.exists()) throw new Error("Você já possui um treino em andamento.");

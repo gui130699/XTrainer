@@ -2,6 +2,7 @@
 
 import { Button, Card } from "@/components/ui";
 import { AppLogo } from "@/components/app-logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { friendlyAuthError, login, registerUser, resetPassword } from "@/services/auth";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
@@ -73,7 +74,7 @@ function AuthForm({ mode, onModeChange }: { mode: Mode; onModeChange: (mode: Mod
 
 export default function Login() {
   const [mode, setMode] = useState<Mode>("login");
-  return <div className="auth"><div className="auth-brand" aria-label="XTrainer"><AppLogo size={64}/></div>
+  return <div className="auth"><ThemeToggle className="auth-theme-toggle"/><div className="auth-brand" aria-label="XTrainer"><AppLogo size={64}/></div>
     <AuthForm key={mode} mode={mode} onModeChange={setMode}/>
   </div>;
 }

@@ -75,19 +75,23 @@ function groupRest(exercise: WorkoutExercise, workout: Workout) {
   return position >= group.exerciseIds.length - 1 ? finite(values.restAfterRound, exercise.restSeconds) : finite(values.restBetweenExercises, 0);
 }
 
-export function createTrainingSets(exerciseInput: WorkoutExercise, workout: Workout): TrainingSet[] {
+export function createTrainingSets(exerciseInput: WorkoutExercise, workout: Workout, previousLoads: number[] = []): TrainingSet[] {
   const exercise = normalizeWorkoutMethod(exerciseInput);
   const method = exercise.methodSnapshot!;
   const values = methodValues(method, exercise.methodConfig);
   const sets = Math.max(1, integer(exercise.sets, 3));
   const reps = Math.max(0, integer(exercise.repsMin, 8));
   const load = Math.max(0, finite(exercise.suggestedLoad, 0));
+  // Cada posição de série (block) mantém a última carga realmente usada nela, em vez de
+  // sempre reiniciar da carga sugerida do treino. Sem histórico para aquela posição, cai
+  // para a carga sugerida.
+  const loadForBlock = (block: number) => { const remembered = previousLoads[block]; return remembered !== undefined && remembered >= 0 ? remembered : load; };
   const finalRest = groupRest(exercise, workout);
   const baseRole = values.setRole === "warmup" || values.setRole === "ramp" ? values.setRole : "working";
   const result: TrainingSet[] = [];
   const push = (blockIndex: number, stageIndex: number, stageCount: number, overrides: Partial<TrainingSet> = {}) => result.push({
     id: `${exercise.id}-${blockIndex}-${stageIndex}`,
-    load, reps, completed: false, volume: 0,
+    load: loadForBlock(blockIndex), reps, completed: false, volume: 0,
     methodId: method.id, methodEngine: method.engine, methodVersion: method.version,
     blockId: `${exercise.id}-block-${blockIndex}`, blockIndex, stageIndex, stageCount,
     setRole: baseRole, restAfterSeconds: stageIndex === stageCount - 1 ? finalRest : 0,
@@ -96,7 +100,7 @@ export function createTrainingSets(exerciseInput: WorkoutExercise, workout: Work
 
   if (method.engine === "drop") {
     const drops = integer(values.drops, 2);
-    for (let block = 0; block < sets; block += 1) for (let stage = 0; stage <= drops; stage += 1) push(block, stage, drops + 1, { load: Math.max(0, load * Math.pow(1 - finite(values.reductionPercent, 20) / 100, stage)), setRole: stage ? "drop" : baseRole, restAfterSeconds: stage === drops ? finalRest : finite(values.restBetweenDrops, 0), toFailure: stage === drops && values.lastDropToFailure === true });
+    for (let block = 0; block < sets; block += 1) for (let stage = 0; stage <= drops; stage += 1) push(block, stage, drops + 1, { load: Math.max(0, loadForBlock(block) * Math.pow(1 - finite(values.reductionPercent, 20) / 100, stage)), setRole: stage ? "drop" : baseRole, restAfterSeconds: stage === drops ? finalRest : finite(values.restBetweenDrops, 0), toFailure: stage === drops && values.lastDropToFailure === true });
   } else if (method.engine === "rest-pause") {
     const pauses = integer(values.pauses, 2);
     for (let block = 0; block < sets; block += 1) for (let stage = 0; stage <= pauses; stage += 1) push(block, stage, pauses + 1, { reps: stage ? integer(values.extraReps, 3) : reps, setRole: stage ? "pause" : baseRole, restAfterSeconds: stage === pauses ? finalRest : finite(values.pauseSeconds, 15) });
