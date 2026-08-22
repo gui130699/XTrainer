@@ -1,6 +1,6 @@
 "use client";
 import { Check, ExternalLink, Pencil, Plus, Repeat } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button, Card } from "@/components/ui";
 import { trainingStageLabel } from "@/lib/training-methods";
 import { ExerciseSwapPicker } from "@/components/training-methods/exercise-swap-picker";
@@ -11,7 +11,8 @@ export function TrainingMethodExecution({ exercise, exerciseIndex, library, onCh
   const [swapping, setSwapping] = useState(false);
   const allCompleted = exercise.sets.length > 0 && exercise.sets.every((item) => item.completed);
   const [collapsed, setCollapsed] = useState(false);
-  useEffect(() => { if (allCompleted) setCollapsed(true); }, [allCompleted]);
+  const [prevAllCompleted, setPrevAllCompleted] = useState(allCompleted);
+  if (allCompleted !== prevAllCompleted) { setPrevAllCompleted(allCompleted); if (allCompleted) setCollapsed(true); }
   const videoUrl = library.find((item) => item.id === exercise.exerciseId)?.videoUrl;
 
   return <Card className={`exercise method-execution ${collapsed ? "is-collapsed" : ""}`}>

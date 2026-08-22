@@ -1,6 +1,6 @@
 "use client";
 import { Check, ExternalLink, Pencil, Repeat } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button, Card } from "@/components/ui";
 import { trainingStageLabel } from "@/lib/training-methods";
 import { ExerciseSwapPicker } from "@/components/training-methods/exercise-swap-picker";
@@ -11,7 +11,8 @@ export function TrainingGroupExecution({ group, members, allExercises, library, 
   const allCompleted = members.every((exercise) => exercise.sets.length > 0 && exercise.sets.every((item) => item.completed));
   const [collapsed, setCollapsed] = useState(false);
   const [swappingId, setSwappingId] = useState<string | null>(null);
-  useEffect(() => { if (allCompleted) setCollapsed(true); }, [allCompleted]);
+  const [prevAllCompleted, setPrevAllCompleted] = useState(allCompleted);
+  if (allCompleted !== prevAllCompleted) { setPrevAllCompleted(allCompleted); if (allCompleted) setCollapsed(true); }
 
   return <Card className={`group-execution ${collapsed ? "is-collapsed" : ""}`}>
     <div className="method-execution-title"><div><p className="eyebrow">SEQUÊNCIA COMBINADA</p><h2>{group.name}</h2><span className="method-chip">{group.methodSnapshot.name}</span></div><p>{group.methodSnapshot.fullDescription}</p></div>
