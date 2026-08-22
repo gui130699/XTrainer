@@ -61,6 +61,17 @@ Usuário cria o próprio documento apenas com `role: user`, lê o próprio e alt
 
 Catálogo global. Autenticados leem; somente `adminUid` escreve. O seed contém 202 IDs determinísticos, valida duplicidades/ordem/URLs e preserva `active` em documentos existentes.
 
+## `muscleGroups/{muscleGroupId}`
+
+| Campo | Tipo | Obrigatório |
+|---|---|---:|
+| `name` | string | sim |
+| `sortOrder` | number | não |
+| `active` | boolean | sim |
+| `createdAt`, `updatedAt` | Timestamp | não |
+
+Catálogo global gerenciado no painel Admin (`/grupos-musculares`). Autenticados leem; somente `adminUid` escreve. ID do documento é o slug do nome. `exercises.muscleGroup` guarda o nome (string livre) e passa a ser preenchido por um `<select>` no Admin a partir deste catálogo; o botão "Importar dos exercícios" popula o catálogo a partir dos valores já usados nos exercícios existentes, sem duplicar.
+
 ## `workouts/{workoutId}`
 
 | Campo | Tipo | Obrigatório |

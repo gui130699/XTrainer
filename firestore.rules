@@ -53,6 +53,14 @@ service cloud.firestore {
         && (!('sortOrder' in data) || data.sortOrder is number);
     }
 
+    function validMuscleGroup(data) {
+      return data.keys().hasAll(['name', 'active'])
+        && data.keys().hasOnly(['name', 'sortOrder', 'active', 'createdAt', 'updatedAt'])
+        && data.name is string
+        && data.active is bool
+        && (!('sortOrder' in data) || data.sortOrder is number);
+    }
+
     function validWorkout(data) {
       return data.keys().hasAll(['ownerId', 'name', 'title', 'muscleGroups', 'exercises', 'active'])
         && data.keys().hasOnly(['id', 'ownerId', 'name', 'title', 'description', 'muscleGroups', 'exercises', 'exerciseGroups', 'active', 'createdAt', 'updatedAt'])
@@ -141,6 +149,12 @@ service cloud.firestore {
     match /exercises/{id} {
       allow read: if signedIn();
       allow create, update: if isAdmin() && validExercise(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /muscleGroups/{id} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && validMuscleGroup(request.resource.data);
       allow delete: if isAdmin();
     }
 

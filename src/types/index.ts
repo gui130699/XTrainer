@@ -42,6 +42,15 @@ export interface Exercise {
   updatedAt?: Timestamp;
 }
 
+export interface MuscleGroup {
+  id: Id;
+  name: string;
+  sortOrder?: number;
+  active: boolean;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
 export interface DefaultExercise {
   id: Id;
   name: string;

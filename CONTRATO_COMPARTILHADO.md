@@ -30,6 +30,7 @@ XTrainer Admin:
 - autentica apenas o UID configurado;
 - lista identificação mínima de contas;
 - cria, edita, ativa/desativa, importa e exporta exercícios;
+- cria, edita e ativa/desativa grupos musculares (`muscleGroups`), incluindo importação a partir dos valores já usados em `exercises.muscleGroup`;
 - grava audit logs;
 - não consulta dados privados do usuário, incluindo `exerciseSubstitutionPreferences`.
 

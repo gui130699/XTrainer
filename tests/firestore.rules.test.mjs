@@ -82,6 +82,14 @@ test("usuário lê exercícios, mas somente admin altera a biblioteca", async ()
   await assertSucceeds(updateDoc(doc(admin, "exercises", "supino"), { active: false }));
 });
 
+test("catálogo de grupos musculares é global para autenticados e gravável apenas pelo admin", async () => {
+  await assertSucceeds(setDoc(doc(admin, "muscleGroups", "peito"), { name: "Peito", active: true, sortOrder: 1 }));
+  await assertSucceeds(getDoc(doc(userA, "muscleGroups", "peito")));
+  await assertFails(getDoc(doc(anonymous, "muscleGroups", "peito")));
+  await assertFails(setDoc(doc(userA, "muscleGroups", "costas"), { name: "Costas", active: true }));
+  await assertSucceeds(updateDoc(doc(admin, "muscleGroups", "peito"), { active: false }));
+});
+
 test("catálogo de métodos é global para autenticados e gravável apenas pelo admin", async () => {
   await assertSucceeds(getDoc(doc(userA, "trainingMethods", "series-normais")));
   await assertFails(getDoc(doc(anonymous, "trainingMethods", "series-normais")));

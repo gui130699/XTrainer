@@ -76,8 +76,8 @@
 
 .assessment-cancel-button {
   min-width: 125px;
-  border: 1px solid #455d74;
-  background: #111f2e;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elevated);
   color: var(--text-emphasis);
 }
 
