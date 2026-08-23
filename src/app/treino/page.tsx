@@ -94,6 +94,11 @@ function Work() {
   const [preferencesPanelOpen, setPreferencesPanelOpen] = useState(false);
   const { preferences, update: updateTrainingPreferences } = useTrainingPreferences();
   const prevRestSecondsRef = useRef(0);
+  // Duracao total do descanso atual, usada somente para desenhar o progresso visual do
+  // cronometro (anel). Puramente local/derivado - nao e persistido nem influencia
+  // restEndsAt, notificacoes, som ou vibracao, que continuam vindo de restSeconds/restEndsAt.
+  const [restTotal, setRestTotal] = useState<{ endsAtMs: number; totalSeconds: number } | null>(null);
+  const [restTotalTrackedEndsAtMs, setRestTotalTrackedEndsAtMs] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     if (!uid) return;
@@ -150,6 +155,13 @@ function Work() {
   const activePlans = plans.filter((item) => item.active);
   const archivedPlans = plans.filter((item) => !item.active);
   const restSeconds = session?.restEndsAt ? Math.max(0, Math.ceil((session.restEndsAt.toMillis() - clock) / 1000)) : 0;
+  const restEndsAtMs = session?.restEndsAt?.toMillis() ?? null;
+  if (restEndsAtMs !== restTotalTrackedEndsAtMs) {
+    setRestTotalTrackedEndsAtMs(restEndsAtMs);
+    setRestTotal(restEndsAtMs ? { endsAtMs: restEndsAtMs, totalSeconds: Math.max(1, Math.ceil((restEndsAtMs - clock) / 1000)) } : null);
+  }
+  const restTotalSeconds = restTotal?.endsAtMs === restEndsAtMs ? restTotal.totalSeconds : restSeconds;
+  const restProgress = restTotalSeconds > 0 ? Math.min(1, Math.max(0, 1 - restSeconds / restTotalSeconds)) : 0;
   useEffect(() => {
     const previous = prevRestSecondsRef.current;
     prevRestSecondsRef.current = restSeconds;
@@ -539,11 +551,17 @@ function Work() {
   if (summary) return <AppShell><header><p className="eyebrow">TREINO CONCLUÍDO</p><h1>{summary.session.workoutName}</h1><p>Seu desempenho foi salvo no histórico.</p></header><div className="stat-grid"><Card><span>Duração</span><strong>{Math.round((summary.session.durationSeconds ?? 0) / 60)} min</strong></Card><Card><span>Volume</span><strong>{Math.round(summary.session.totalVolume).toLocaleString("pt-BR")} kg</strong></Card><Card><span>Séries</span><strong>{summary.session.totalSets}</strong></Card><Card><span>Exercícios</span><strong>{summary.session.exercises.length}</strong></Card></div><Card><h2>Recordes alcançados</h2>{summary.records.length ? summary.records.map((record, index) => <div className="row" key={`${record.exerciseId}-${record.kind}-${index}`}><strong>{record.name}</strong><span>{record.kind === "load" ? `${record.value.toLocaleString("pt-BR")} kg` : record.kind === "reps" ? `${record.value} repetições` : `${Math.round(record.value).toLocaleString("pt-BR")} kg de volume`}</span></div>) : <Empty title="Nenhum recorde novo nesta sessão" detail="Continue treinando para acompanhar sua progressão automática."/>}{summary.analyticsWarning && <p className="error">{summary.analyticsWarning}</p>}</Card><Button onClick={() => setSummary(null)}>VOLTAR AOS TREINOS</Button></AppShell>;
 
   if (session) return <AppShell><header><div className="row" style={{ border: 0, padding: 0, alignItems: "flex-start" }}><div><p className="eyebrow">EM ANDAMENTO</p><h1>{session.workoutName}</h1><p>{session.totalSets} séries concluídas · {Math.round(session.totalVolume).toLocaleString("pt-BR")} kg</p></div><button type="button" className="icon-button" onClick={() => setPreferencesPanelOpen(true)} aria-label="Preferências do treino"><Settings size={18}/></button></div><p className={`sync-status ${syncStatus}`} role="status">{syncStatus === "saving" ? "Salvando..." : syncStatus === "saved" ? "Salvo" : syncStatus === "offline" ? "Salvo neste dispositivo. Aguardando sincronização." : syncStatus === "error" ? "Erro ao sincronizar. Use Tentar novamente." : "Alterações locais"}{syncStatus === "error" && <button className="text-button" onClick={() => void syncSession(session)}>Tentar novamente</button>}{wakeLockActive && <span className="status-badge is-wake-lock"><MonitorSmartphone size={12}/> Tela ativa</span>}</p>{notifyPermission === "default" && <button type="button" className="text-button" onClick={() => void enableNotifications()}><Bell size={15}/> Ativar notificações do cronômetro de descanso</button>}{notifyPermission === "denied" && <p className="error">Notificações bloqueadas pelo navegador. Ative nas configurações do site para ver o cronômetro de descanso nas notificações.</p>}</header>
-    {restSeconds > 0 && <Card className="rest"><Timer/><strong>{String(Math.floor(restSeconds / 60)).padStart(2, "0")}:{String(restSeconds % 60).padStart(2, "0")}</strong><Button onClick={() => void syncSession({ ...session, restEndsAt: undefined })}>PULAR DESCANSO</Button><button className="text-button" onClick={() => void syncSession({ ...session, restEndsAt: Timestamp.fromMillis((session.restEndsAt?.toMillis() ?? Date.now()) + 15000) })}>+15s</button></Card>}
+    {restSeconds > 0 && <Card className="rest">
+      <div className="rest-ring" style={{ "--rest-progress": restProgress } as React.CSSProperties}>
+        <svg viewBox="0 0 80 80" width="66" height="66" aria-hidden="true"><circle className="rest-ring-track" cx="40" cy="40" r="34"/><circle className="rest-ring-progress" cx="40" cy="40" r="34"/></svg>
+        <span className="rest-ring-value">{String(Math.floor(restSeconds / 60)).padStart(2, "0")}:{String(restSeconds % 60).padStart(2, "0")}</span>
+      </div>
+      <div className="rest-info"><span className="eyebrow"><Timer size={13}/> DESCANSO</span><div className="rest-actions"><Button onClick={() => void syncSession({ ...session, restEndsAt: undefined })}>PULAR DESCANSO</Button><button className="text-button" onClick={() => void syncSession({ ...session, restEndsAt: Timestamp.fromMillis((session.restEndsAt?.toMillis() ?? Date.now()) + 15000) })}>+15s</button></div></div>
+    </Card>}
     {session.exercises.map((exercise, exerciseIndex) => {
       const preferredIds = exercisePrefs.find((item) => item.exerciseId === exercise.exerciseId)?.alternativeExerciseIds ?? [];
       if (exercise.target.groupId) { const group = session.exerciseGroups?.find((item) => item.id === exercise.target.groupId); if (!group || group.exerciseIds[0] !== exercise.id) return null; const members = group.exerciseIds.map((id) => session.exercises.find((item) => item.id === id)).filter((item): item is typeof exercise => Boolean(item)); return <TrainingGroupExecution key={group.id} group={group} members={members} allExercises={session.exercises} library={library} preferredIds={preferredIds} onChange={changeSet} onComplete={(item, set, completed) => void completeSet(item, set, completed)} onPickReplacement={beginSwap} onTogglePreferred={(exerciseId, candidateId) => void togglePreferred(exerciseId, candidateId)} onSkip={beginSkip} onUndoSkip={(item) => void undoSkip(item)} onSync={() => session && void syncSession(session)}/>; }
-      return <TrainingMethodExecution key={exercise.id} exercise={exercise} exerciseIndex={exerciseIndex} library={library} preferredIds={preferredIds} onChange={changeSet} onComplete={(item, set, completed) => void completeSet(item, set, completed)} onAdd={(item) => void addSet(item)} onRemove={(item, set) => void removeSet(item, set)} onPickReplacement={beginSwap} onTogglePreferred={(exerciseId, candidateId) => void togglePreferred(exerciseId, candidateId)} onSkip={beginSkip} onUndoSkip={(item) => void undoSkip(item)} onSync={() => session && void syncSession(session)}/>;
+      return <TrainingMethodExecution key={exercise.id} exercise={exercise} exerciseIndex={exerciseIndex} exerciseCount={session.exercises.length} library={library} preferredIds={preferredIds} onChange={changeSet} onComplete={(item, set, completed) => void completeSet(item, set, completed)} onAdd={(item) => void addSet(item)} onRemove={(item, set) => void removeSet(item, set)} onPickReplacement={beginSwap} onTogglePreferred={(exerciseId, candidateId) => void togglePreferred(exerciseId, candidateId)} onSkip={beginSkip} onUndoSkip={(item) => void undoSkip(item)} onSync={() => session && void syncSession(session)}/>;
     })}
     {message && <p className="error" role="alert">{message}</p>}<Button className="finish" onClick={() => void finish()} disabled={saving}>{saving ? "FINALIZANDO..." : "FINALIZAR TREINO"}</Button><button className="text-button" onClick={() => void cancel(session)} disabled={saving}>Cancelar treino</button>
     {swapTarget && <ExerciseSwapScopeModal fromName={swapTarget.fromName} toName={swapTarget.replacement.name} saving={swapSaving} onConfirm={(scope) => void confirmSwap(scope)} onCancel={() => setSwapTarget(null)}/>}

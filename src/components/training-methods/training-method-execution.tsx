@@ -6,9 +6,10 @@ import { trainingStageLabel } from "@/lib/training-methods";
 import { ExerciseSwapPicker } from "@/components/training-methods/exercise-swap-picker";
 import type { Exercise, SessionExercise, TrainingSet } from "@/types";
 
-export function TrainingMethodExecution({ exercise, exerciseIndex, library, preferredIds, onChange, onComplete, onAdd, onRemove, onPickReplacement, onTogglePreferred, onSkip, onUndoSkip, onSync }: {
+export function TrainingMethodExecution({ exercise, exerciseIndex, exerciseCount, library, preferredIds, onChange, onComplete, onAdd, onRemove, onPickReplacement, onTogglePreferred, onSkip, onUndoSkip, onSync }: {
   exercise: SessionExercise;
   exerciseIndex: number;
+  exerciseCount?: number;
   library: Exercise[];
   preferredIds: string[];
   onChange: (exerciseIndex: number, setIndex: number, data: Partial<TrainingSet>) => void;
@@ -32,7 +33,7 @@ export function TrainingMethodExecution({ exercise, exerciseIndex, library, pref
 
   return <Card className={`exercise method-execution ${collapsed ? "is-collapsed" : ""} ${skipped ? "is-skipped" : ""}`}>
     <div className="method-execution-title">
-      <div><h2>{exercise.name}
+      <div>{exerciseCount != null && <span className="exercise-counter">EXERCÍCIO {exerciseIndex + 1} DE {exerciseCount}</span>}<h2>{exercise.name}
         {exercise.substitutionType === "session-only" && <span className="status-badge is-session-only">Só nesta sessão</span>}
         {skipped && <span className="status-badge is-skipped">Pulado hoje</span>}
       </h2>
