@@ -5,7 +5,20 @@ import { Guard } from "@/components/guard";
 import { useAuth } from "@/components/providers";
 import { Button, Card } from "@/components/ui";
 import { changePassword, friendlyAuthError, logout, updateProfile } from "@/services/auth";
+import { db } from "@/lib/firebase";
+import { collection, doc, getDoc, getDocs, limit, query } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
+
+async function probeFirestore() {
+  const probe = async (label: string, run: () => Promise<unknown>) => {
+    try { await run(); return { label, ok: true }; }
+    catch (reason) { return { label, ok: false, code: typeof reason === "object" && reason !== null && "code" in reason ? String((reason as { code: unknown }).code) : null, message: reason instanceof Error ? reason.message : String(reason) }; }
+  };
+  return Promise.all([
+    probe("system/config (leitura pública)", () => getDoc(doc(db, "system", "config"))),
+    probe("exercises (leitura autenticada global)", () => getDocs(query(collection(db, "exercises"), limit(1)))),
+  ]);
+}
 
 const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const pad2 = (value: number) => String(value).padStart(2, "0");
@@ -83,7 +96,8 @@ function Profile() {
       } catch (tokenError) {
         tokenInfo = { tokenError: tokenError instanceof Error ? tokenError.message : String(tokenError) };
       }
-      setDebugInfo({ errorCode, errorMessageRaw, authUid: user?.uid ?? null, authEmail: user?.email ?? null, authEmailVerified: user?.emailVerified ?? null, tokenInfo, profile });
+      const probes = await probeFirestore();
+      setDebugInfo({ errorCode, errorMessageRaw, authUid: user?.uid ?? null, authEmail: user?.email ?? null, authEmailVerified: user?.emailVerified ?? null, tokenInfo, profile, probes });
     } finally {
       setSaving(false);
     }
