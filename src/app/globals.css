@@ -5,11 +5,13 @@
   --shadow-sm:0 2px 10px #00000033;--shadow-md:0 12px 32px #00000040;--shadow-lg:0 26px 64px #00000059;
   --transition-fast:150ms ease;--transition-normal:200ms ease;
   --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-8:32px;--space-10:40px;--space-12:48px;
-  --font-sans:var(--font-inter),Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+  --font-sans:var(--font-inter),Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;--ring-track:#ffffff26;
+  --success-soft:#0f2e22;--warning-soft:#3a2f0f;--error-soft:#3a1a1a}
 :root[data-theme="light"]{--bg:#f3f6fa;--bg-elevated:#eaeff5;--bg-hover:#dfe6ee;--bg-surface-1:#ffffff;--bg-surface-2:#f5f8fb;--bg-surface-deep:#e7ecf2;--bg-panel:#ffffff;--bg-brand-panel:#dbeeff;--bg-brand-panel-2:#c7e4fa;--border:#dbe3ec;--border-strong:#c3ceda;--text:#101826;--text-emphasis:#1c2a3a;--text-emphasis-2:#26374a;--text-muted:#5b6b80;--accent-text:#0e7490;--success:#15803d;--error:#b91c1c;--error-strong:#991b1b;--warning:#92400e;--logo-name-grad-1:#0f1c2e;--logo-name-grad-2:#233246;--logo-name-grad-3:#3a4d63;
   --primary:#0284c7;--primary-hover:#0ea5e9;--primary-active:#0369a1;--primary-soft:#0ea5e914;--primary-border:#0ea5e94d;--primary-text:#0369a1;--primary-strong:#075985;
   --danger:#dc2626;--danger-hover:#ef4444;--danger-soft:#dc26260f;--danger-border:#dc262640;
-  --shadow-sm:0 2px 8px #0f172a14;--shadow-md:0 10px 24px #0f172a1a;--shadow-lg:0 20px 48px #0f172a22}
+  --shadow-sm:0 2px 8px #0f172a14;--shadow-md:0 10px 24px #0f172a1a;--shadow-lg:0 20px 48px #0f172a22;--ring-track:#0f172a1f;
+  --success-soft:#dcfce7;--warning-soft:#fef3c7;--error-soft:#fee2e2}
 *{box-sizing:border-box}html{background:var(--bg)}body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}a{color:inherit;text-decoration:none}button,input,textarea,select{font:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--primary);outline-offset:2px}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}.shell{min-height:100vh;padding-left:244px;transition:padding-left var(--transition-normal)}aside{position:fixed;inset:0 auto 0 0;width:244px;padding:32px 18px;background:var(--bg-elevated);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:width var(--transition-normal);z-index:5}.brand,.auth-brand{font-size:25px;font-weight:900;letter-spacing:-1.2px}.brand span,.auth-brand span{color:var(--brand)}aside nav{display:grid;gap:4px;margin-top:40px}aside nav a{position:relative;display:flex;gap:13px;align-items:center;padding:11px 14px;color:var(--text-muted);border-radius:var(--radius-md);font-weight:600;font-size:14px;transition:background var(--transition-fast),color var(--transition-fast)}aside nav a:hover{background:var(--bg-hover);color:var(--text)}
 aside nav a.active{background:var(--primary-soft);color:var(--text-emphasis);font-weight:800}
 aside nav a.active svg{color:var(--primary-text)}
@@ -56,7 +58,7 @@ a.card:hover,button.card:hover,.card.is-interactive:hover{border-color:var(--bor
 .rest-ring{position:relative;flex:none;width:66px;height:66px;display:grid;place-items:center}
 .rest-ring svg{transform:rotate(-90deg)}
 .rest-ring-track,.rest-ring-progress{fill:none;stroke-width:7}
-.rest-ring-track{stroke:#ffffff1f}
+.rest-ring-track{stroke:var(--ring-track)}
 .rest-ring-progress{stroke:var(--primary-hover);stroke-linecap:round;stroke-dasharray:213.6;stroke-dashoffset:calc(213.6 - (213.6 * var(--rest-progress,0)));transition:stroke-dashoffset 480ms linear}
 .rest-ring-value{position:absolute;font-size:15px;font-weight:800;letter-spacing:-.3px;font-variant-numeric:tabular-nums;color:var(--text-emphasis)}
 .rest-info{display:flex;flex-direction:column;gap:8px;min-width:0}
@@ -120,9 +122,9 @@ button.swap-favorite-toggle.is-active{color:#fbbf24;border-color:#fbbf2455}
 .skip-reason-fieldset{border:1px solid var(--border-strong);border-radius:12px;padding:12px;margin:14px 0;display:grid;gap:8px}
 .skip-reason-fieldset legend{color:var(--accent-text);font-size:11px;font-weight:900;padding:0 5px}
 .status-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;padding:4px 9px;border-radius:999px;margin-left:8px}
-.status-badge.is-session-only{background:#3a2f0f;color:#fde68a}
-.status-badge.is-skipped{background:#3a1a1a;color:#fca5a5}
-.status-badge.is-wake-lock{background:#0f2e22;color:#86efac}
+.status-badge.is-session-only{background:var(--warning-soft);color:var(--warning)}
+.status-badge.is-skipped{background:var(--error-soft);color:var(--error)}
+.status-badge.is-wake-lock{background:var(--success-soft);color:var(--success)}
 .exercise-original-note{font-size:12px;color:var(--text-muted);margin-top:4px}
 .skip-undo-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:8px}
 .training-preferences-list{display:grid;gap:14px;margin:16px 0}
@@ -140,8 +142,8 @@ button.swap-favorite-toggle.is-active{color:#fbbf24;border-color:#fbbf2455}
 .summary-hero-grid strong{display:block;font-size:26px;margin-top:6px}
 .summary-hero-grid span{font-size:11px;color:var(--text-muted);text-transform:uppercase;font-weight:800;letter-spacing:.5px}
 .summary-change-chip{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:800;padding:3px 9px;border-radius:999px;margin-top:6px}
-.summary-change-chip.is-positive{background:#0f2e22;color:#86efac}
-.summary-change-chip.is-negative{background:#3a1a1a;color:#fca5a5}
+.summary-change-chip.is-positive{background:var(--success-soft);color:var(--success)}
+.summary-change-chip.is-negative{background:var(--error-soft);color:var(--error)}
 .summary-change-chip.is-neutral{background:var(--bg-hover);color:var(--text-muted)}
 .summary-period-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
 .summary-period-nav strong{font-size:16px;text-transform:capitalize}
