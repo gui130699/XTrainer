@@ -12,7 +12,6 @@ import { authSchemasByMode } from "@/lib/validation";
 import type { z } from "zod";
 
 type Mode = "login" | "register" | "reset";
-const ADMIN_URL = "https://gui130699.github.io/XTrainer-Admin/";
 const schemasByMode = authSchemasByMode;
 
 type LoginValues = z.infer<typeof schemasByMode.login>;
@@ -67,7 +66,6 @@ function AuthForm({ mode, onModeChange }: { mode: Mode; onModeChange: (mode: Mod
     {mode === "login" ? <div className="auth-actions">
       <button type="button" className="text-button" onClick={() => onModeChange("reset")}>Esqueci minha senha</button>
       <button type="button" className="secondary-button" onClick={() => onModeChange("register")}>CADASTRAR NOVO USUÁRIO</button>
-      <a className="admin-button" href={ADMIN_URL}>ABRIR PAINEL ADMINISTRATIVO</a>
     </div> : <button type="button" className="text-button" onClick={() => onModeChange("login")}>Voltar para entrar</button>}
   </Card>;
 }
