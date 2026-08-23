@@ -1,5 +1,11 @@
 "use client";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, Minus, TrendingDown, TrendingUp } from "lucide-react";
+export function TrendValue({value,suffix="",prefix=""}:{value:number|null|undefined;suffix?:string;prefix?:string}) {
+  if (value==null||Number.isNaN(value)) return <span className="trend-indicator is-neutral"><Minus size={13}/>—</span>;
+  const Icon = value>0?TrendingUp:value<0?TrendingDown:Minus;
+  const formatted = `${value>0?"+":""}${value.toLocaleString("pt-BR",{maximumFractionDigits:1})}`;
+  return <span className="trend-indicator"><Icon size={13}/>{prefix}{formatted}{suffix}</span>;
+}
 export function Button({children,className="",...props}:React.ButtonHTMLAttributes<HTMLButtonElement>) { return <button className={`button ${className}`} {...props}>{children}</button>; }
 export function Card({children,className=""}:{children:React.ReactNode;className?:string}) { return <section className={`card ${className}`}>{children}</section>; }
 export function MetricCard({icon:Icon,label,value,detail,className=""}:{icon?:React.ComponentType<{size?:number}>;label:string;value:React.ReactNode;detail?:React.ReactNode;className?:string}) {
