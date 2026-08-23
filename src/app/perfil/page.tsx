@@ -103,7 +103,16 @@ function Profile() {
         tokenInfo = { tokenError: tokenError instanceof Error ? tokenError.message : String(tokenError) };
       }
       const probes = await probeFirestore();
-      setDebugInfo({ errorCode, errorMessageRaw, authUid: user?.uid ?? null, authEmail: user?.email ?? null, authEmailVerified: user?.emailVerified ?? null, tokenInfo, profile, probes });
+      let retry: Record<string, unknown> | null = null;
+      try {
+        await updateProfile(user!.uid, { name: name.trim() || "Repetir teste", height: height === "" ? undefined : Number(height), goal: goal.trim() || undefined, birthDate: birthYear && birthMonth && birthDay ? `${birthYear}-${pad2(Number(birthMonth))}-${pad2(Number(birthDay))}` : undefined, sex: sex || undefined });
+        retry = { ok: true };
+        await refreshProfile();
+        setMessage("Perfil atualizado na segunda tentativa (automática).");
+      } catch (retryReason) {
+        retry = { ok: false, code: typeof retryReason === "object" && retryReason !== null && "code" in retryReason ? String((retryReason as { code: unknown }).code) : null };
+      }
+      setDebugInfo({ errorCode, errorMessageRaw, authUid: user?.uid ?? null, authEmail: user?.email ?? null, authEmailVerified: user?.emailVerified ?? null, tokenInfo, profile, probes, retryImmediatelyAfterProbes: retry });
     } finally {
       setSaving(false);
     }
