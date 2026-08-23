@@ -135,12 +135,12 @@
 }
 
 .draft-summary-chips > span b {
-  color: #e6f3fb;
+  color: var(--text-emphasis);
 }
 
 .draft-summary-chips .draft-method-chip {
-  border-color: #0e7490;
-  background: #08334480;
+  border-color: var(--primary-border);
+  background: var(--primary-soft);
   color: var(--accent-text);
   font-weight: 800;
 }

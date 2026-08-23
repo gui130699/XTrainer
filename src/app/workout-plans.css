@@ -49,7 +49,7 @@
 .workout-plan-label {
   display: block;
   margin-bottom: 8px;
-  color: #22d3ee;
+  color: var(--accent-text);
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 1.5px;
@@ -67,9 +67,9 @@
   align-items: center;
   min-height: 30px;
   padding: 0 11px;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--primary-border);
   border-radius: 999px;
-  background: #0b355866;
+  background: var(--primary-soft);
   color: var(--accent-text);
   font-size: 11px;
   font-weight: 800;
@@ -83,8 +83,8 @@
 }
 
 .workout-plan-done-count {
-  border-color: #16a34a66;
-  background: #14532d4d;
+  border-color: var(--success);
+  background: var(--success-soft);
   color: var(--success);
   gap: 4px;
 }
@@ -97,13 +97,13 @@
   place-items: center;
   border: 1px solid var(--border-strong);
   border-radius: 10px;
-  background: #0b35584d;
-  color: #67e8f9;
+  background: var(--bg-hover);
+  color: var(--primary-text);
   transition: transform 180ms ease, background 180ms ease;
 }
 
 .workout-plan-toggle:hover .workout-plan-chevron {
-  background: #0e749066;
+  background: var(--primary-border);
 }
 
 .workout-plan-card.is-expanded .workout-plan-chevron {
@@ -123,7 +123,7 @@
   padding: 15px;
   border: 1px solid var(--border-strong);
   border-radius: 15px;
-  background: #07111f99;
+  background: var(--bg-elevated);
   animation: workout-list-in 170ms ease-out;
 }
 
@@ -147,14 +147,14 @@
 }
 
 .workout-exercise-list-title > span {
-  color: #22d3ee;
+  color: var(--accent-text);
   font-size: 10px;
   font-weight: 900;
   letter-spacing: 1.2px;
 }
 
 .workout-exercise-list-title small {
-  color: #71869b;
+  color: var(--text-muted);
   font-size: 10px;
 }
 
@@ -171,7 +171,7 @@
   align-items: flex-start;
   gap: 11px;
   padding: 12px 2px;
-  border-top: 1px solid #203448;
+  border-top: 1px solid var(--border);
 }
 
 .workout-exercise-number {
@@ -180,9 +180,9 @@
   flex: none;
   display: grid;
   place-items: center;
-  border: 1px solid #21628a;
+  border: 1px solid var(--primary-border);
   border-radius: 8px;
-  background: #0b355866;
+  background: var(--primary-soft);
   color: var(--accent-text);
   font-size: 11px;
   font-weight: 900;
@@ -221,8 +221,8 @@
 }
 
 .workout-exercise-meta span:first-child {
-  border-color: #0e7490;
-  background: #08334480;
+  border-color: var(--primary-border);
+  background: var(--primary-soft);
   color: var(--accent-text);
   font-weight: 800;
 }
@@ -262,8 +262,8 @@
 }
 
 .workout-action-button:hover {
-  border-color: #0ea5e9;
-  background: #0b355855;
+  border-color: var(--primary);
+  background: var(--primary-soft);
   color: var(--accent-text);
 }
 
