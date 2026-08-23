@@ -5,26 +5,7 @@ import { Guard } from "@/components/guard";
 import { useAuth } from "@/components/providers";
 import { Button, Card } from "@/components/ui";
 import { changePassword, friendlyAuthError, logout, updateProfile } from "@/services/auth";
-import { db } from "@/lib/firebase";
-import { clearIndexedDbPersistence, collection, doc, getDoc, getDocs, limit, query, terminate } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
-
-async function clearLocalCacheAndReload() {
-  try { await terminate(db); await clearIndexedDbPersistence(db); }
-  catch { /* still reload even if this fails */ }
-  finally { window.location.reload(); }
-}
-
-async function probeFirestore() {
-  const probe = async (label: string, run: () => Promise<unknown>) => {
-    try { await run(); return { label, ok: true }; }
-    catch (reason) { return { label, ok: false, code: typeof reason === "object" && reason !== null && "code" in reason ? String((reason as { code: unknown }).code) : null, message: reason instanceof Error ? reason.message : String(reason) }; }
-  };
-  return Promise.all([
-    probe("system/config (leitura pública)", () => getDoc(doc(db, "system", "config"))),
-    probe("exercises (leitura autenticada global)", () => getDocs(query(collection(db, "exercises"), limit(1)))),
-  ]);
-}
 
 const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 const pad2 = (value: number) => String(value).padStart(2, "0");
@@ -46,7 +27,6 @@ function Profile() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [passwordSaving, setPasswordSaving] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<Record<string, unknown> | null>(null);
 
   const currentYear = useMemo(() => new Date().getFullYear(), []);
   const yearOptions = useMemo(() => Array.from({ length: 100 }, (_, index) => currentYear - 5 - index), [currentYear]);
@@ -92,27 +72,11 @@ function Profile() {
       await refreshProfile();
       setMessage("Perfil atualizado. As alterações já estão visíveis no aplicativo.");
     } catch (reason) {
-      setError(friendlyAuthError(reason));
-      const errorCode = typeof reason === "object" && reason !== null && "code" in reason ? String((reason as { code: unknown }).code) : null;
-      const errorMessageRaw = reason instanceof Error ? reason.message : String(reason);
-      let tokenInfo: Record<string, unknown> | null = null;
-      try {
-        const result = await user?.getIdTokenResult(true);
-        tokenInfo = result ? { uid: result.claims.user_id ?? result.claims.sub, authTime: result.authTime, issuedAtTime: result.issuedAtTime, expirationTime: result.expirationTime, signInProvider: result.signInProvider } : null;
-      } catch (tokenError) {
-        tokenInfo = { tokenError: tokenError instanceof Error ? tokenError.message : String(tokenError) };
-      }
-      const probes = await probeFirestore();
-      let retry: Record<string, unknown> | null = null;
-      try {
-        await updateProfile(user!.uid, { name: name.trim() || "Repetir teste", height: height === "" ? undefined : Number(height), goal: goal.trim() || undefined, birthDate: birthYear && birthMonth && birthDay ? `${birthYear}-${pad2(Number(birthMonth))}-${pad2(Number(birthDay))}` : undefined, sex: sex || undefined });
-        retry = { ok: true };
-        await refreshProfile();
-        setMessage("Perfil atualizado na segunda tentativa (automática).");
-      } catch (retryReason) {
-        retry = { ok: false, code: typeof retryReason === "object" && retryReason !== null && "code" in retryReason ? String((retryReason as { code: unknown }).code) : null };
-      }
-      setDebugInfo({ errorCode, errorMessageRaw, authUid: user?.uid ?? null, authEmail: user?.email ?? null, authEmailVerified: user?.emailVerified ?? null, tokenInfo, profile, probes, retryImmediatelyAfterProbes: retry });
+      const code = typeof reason === "object" && reason !== null && "code" in reason ? String((reason as { code: unknown }).code) : null;
+      console.error("Falha ao salvar o perfil:", reason);
+      setError(code === "permission-denied"
+        ? "Não foi possível salvar seu perfil. Sua sessão está ativa, mas o Firestore recusou a gravação. Tente novamente em instantes."
+        : friendlyAuthError(reason));
     } finally {
       setSaving(false);
     }
@@ -142,7 +106,6 @@ function Profile() {
 
   return <AppShell><header><p className="eyebrow">PERFIL</p><div className="profile-heading"><div><h1>{profile?.name || user.displayName || "Seu perfil"}</h1><p>{user.email}</p></div></div></header>
     {message && <p className="success" role="status">{message}</p>}{error && <p className="error" role="alert">{error}</p>}
-    {debugInfo && <Card><h2>Diagnóstico temporário</h2><p>Informações de auth/token e documento no momento do erro (remover após investigar).</p><Button className="secondary" type="button" onClick={() => void clearLocalCacheAndReload()}>LIMPAR CACHE LOCAL E RECARREGAR</Button><pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-all", fontSize: 12, marginTop: 12 }}>{JSON.stringify(debugInfo, null, 2)}</pre></Card>}
     <Card><h2>Dados pessoais</h2><p>Informações corporais são opcionais e privadas.</p><form onSubmit={save}><div className="form-grid"><label>Nome<input required value={name} onChange={(event) => setName(event.target.value)} autoComplete="name"/></label><label>Altura (cm)<input value={height} onChange={(event) => setHeight(event.target.value)} type="number" min="1" max="300" step="0.1" inputMode="decimal"/></label><label>Objetivo<input value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="Ex.: hipertrofia"/></label><label>Data de nascimento<div className="birth-date-fields"><select aria-label="Dia" value={birthDay} onChange={(event) => setBirthDay(event.target.value)}><option value="">Dia</option>{dayOptions.map((day) => <option key={day} value={day}>{day}</option>)}</select><select aria-label="Mês" value={birthMonth} onChange={(event) => setBirthMonth(event.target.value)}><option value="">Mês</option>{MONTH_NAMES.map((label, index) => <option key={label} value={index + 1}>{label}</option>)}</select><select aria-label="Ano" value={birthYear} onChange={(event) => setBirthYear(event.target.value)}><option value="">Ano</option>{yearOptions.map((year) => <option key={year} value={year}>{year}</option>)}</select></div></label><label>Sexo (opcional)<select value={sex} onChange={(event) => setSex(event.target.value)}><option value="">Prefiro não informar</option><option value="female">Feminino</option><option value="male">Masculino</option><option value="other">Outro</option></select></label></div><Button disabled={saving}>{saving ? "SALVANDO..." : "SALVAR PERFIL"}</Button></form></Card>
     <Card><h2>Alterar senha</h2><p>Confirme sua senha atual para proteger a conta.</p><form onSubmit={savePassword}><label>Senha atual<input required name="currentPassword" type="password" autoComplete="current-password"/></label><label>Nova senha<input required minLength={6} name="newPassword" type="password" autoComplete="new-password"/></label><label>Confirmar nova senha<input required minLength={6} name="confirmPassword" type="password" autoComplete="new-password"/></label><Button disabled={passwordSaving}>{passwordSaving ? "ALTERANDO..." : "ALTERAR SENHA"}</Button></form></Card>
     <Button className="outline mobile-profile-logout" onClick={() => void logout()}>SAIR</Button>

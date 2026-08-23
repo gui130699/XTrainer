@@ -74,6 +74,25 @@ test("usuário atualiza os próprios dados pessoais sem alterar identidade ou pa
   await assertSucceeds(updateDoc(reference, { birthDate: deleteField(), sex: deleteField(), updatedAt: Timestamp.now() }));
   await assertFails(updateDoc(reference, { uid: "user-b" }));
   await assertFails(updateDoc(reference, { role: "admin" }));
+  await assertFails(updateDoc(reference, { createdAt: Timestamp.now() }));
+});
+
+test("Authentication existe mas users/{uid} não existe: dono cria o próprio perfil mínimo", async () => {
+  const orphan = environment.authenticatedContext("orphan-user").firestore();
+  const reference = doc(orphan, "users", "orphan-user");
+  await assertSucceeds(getDoc(reference));
+  await assertSucceeds(setDoc(reference, { uid: "orphan-user", name: "Órfão", email: "orphan@test.dev", role: "user" }));
+  await assertSucceeds(updateDoc(reference, { name: "Órfão Atualizado", updatedAt: Timestamp.now() }));
+});
+
+test("perfil órfão: não pode criar para outro UID nem se autopromover a admin", async () => {
+  const orphan = environment.authenticatedContext("orphan-b").firestore();
+  await assertFails(setDoc(doc(orphan, "users", "someone-else"), { uid: "someone-else", name: "Invasor", email: "x@test.dev", role: "user" }));
+  await assertFails(setDoc(doc(orphan, "users", "orphan-b"), { uid: "orphan-b", name: "Órfão", email: "orphan-b@test.dev", role: "admin" }));
+});
+
+test("autoridade administrativa deriva de system/config.adminUid, não do campo role do próprio perfil", async () => {
+  await assertSucceeds(getDoc(doc(admin, "users", "user-a")));
 });
 
 test("usuário lê exercícios, mas somente admin altera a biblioteca", async () => {

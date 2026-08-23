@@ -3,7 +3,7 @@
 import { onAuthStateChanged, type User, updateProfile as updateAuthProfile } from "firebase/auth";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { auth } from "@/lib/firebase";
-import { getSystemConfig, profile as loadProfile } from "@/services/auth";
+import { ensureUserProfile, getSystemConfig } from "@/services/auth";
 import type { UserProfile } from "@/types";
 
 type State = {
@@ -50,7 +50,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       setAdmin(false);
       return;
     }
-    const [userProfile, config] = await Promise.all([loadProfile(current.uid), getSystemConfig()]);
+    const [userProfile, config] = await Promise.all([ensureUserProfile(current), getSystemConfig()]);
     if (userProfile?.name && current.displayName !== userProfile.name) {
       await updateAuthProfile(current, { displayName: userProfile.name });
     }
@@ -70,7 +70,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }
       try {
         await refreshProfile();
-      } catch {
+      } catch (error) {
+        // Documento ausente já é resolvido dentro de ensureUserProfile; chegar aqui é um erro
+        // real (rede, permissão inesperada etc.) — não deve ficar silencioso.
+        console.error("Falha ao carregar/preparar o perfil do usuário:", error);
         setProfile(null);
         setAdmin(false);
       } finally {

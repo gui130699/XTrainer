@@ -62,17 +62,41 @@ export async function profile(uid: string) {
   return snapshot.exists() ? snapshot.data() as UserProfile : null;
 }
 
+// Alguns UIDs existem no Authentication sem um users/{uid} correspondente (ex.: conta criada
+// direto no Console, ou perfil perdido por algum motivo histórico). updateDoc() exige que o
+// documento já exista, então qualquer escrita nesse caso falha com permission-denied — não por
+// falta de permissão de fato, mas porque as Rules de update dependem de resource.data já existir.
+// ensureUserProfile cria um perfil mínimo válido (papel sempre "user") quando o documento não
+// existe, e não toca em nada quando já existe. Poder administrativo nunca vem daqui: continua
+// derivando exclusivamente de system/config.adminUid (ver Providers/isAdmin()).
+export async function ensureUserProfile(user: User): Promise<UserProfile> {
+  const reference = doc(db, "users", user.uid);
+  const snapshot = await getDoc(reference);
+  if (snapshot.exists()) return snapshot.data() as UserProfile;
+  const base: UserProfile = {
+    uid: user.uid,
+    name: user.displayName?.trim() || user.email?.split("@")[0] || "Usuário",
+    email: user.email ?? "",
+    role: "user",
+  };
+  await setDoc(reference, { ...base, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  return base;
+}
+
 type EditableProfile = Pick<UserProfile, "name" | "height" | "goal" | "birthDate" | "sex">;
 
 export async function updateProfile(uid: string, data: Partial<EditableProfile>) {
+  const current = auth.currentUser;
+  if (!current || current.uid !== uid) throw new Error("Sessão inválida para atualizar este perfil.");
+  await ensureUserProfile(current);
   const payload: Record<string, unknown> = { updatedAt: serverTimestamp() };
   if (data.name !== undefined) payload.name = data.name;
   for (const key of ["height", "goal", "birthDate", "sex"] as const) {
     if (Object.prototype.hasOwnProperty.call(data, key)) payload[key] = data[key] ?? deleteField();
   }
   await updateDoc(doc(db, "users", uid), payload);
-  if (auth.currentUser?.uid === uid && data.name !== undefined) {
-    await updateAuthProfile(auth.currentUser, { displayName: data.name });
+  if (data.name !== undefined) {
+    await updateAuthProfile(current, { displayName: data.name });
   }
 }
 
