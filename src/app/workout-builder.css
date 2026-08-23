@@ -10,9 +10,9 @@
 
 .workout-draft-item.is-collapsed {
   margin-bottom: 0;
-  border-color: #28516c;
+  border-color: var(--border-strong);
   background: linear-gradient(135deg, var(--bg-surface-deep), var(--bg-elevated));
-  box-shadow: 0 8px 24px #02061740;
+  box-shadow: var(--shadow-sm);
 }
 
 .workout-draft-header {
@@ -36,10 +36,10 @@
   flex: none;
   display: grid;
   place-items: center;
-  border: 1px solid #1d9bd1;
+  border: 1px solid var(--border-strong);
   border-radius: 9px;
-  background: var(--bg-brand-panel);
-  color: var(--accent-text);
+  background: var(--bg-hover);
+  color: var(--text-emphasis);
   font-size: 12px;
   font-weight: 900;
 }
@@ -86,21 +86,23 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid #22d3ee;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
   padding: 0 16px;
-  background: linear-gradient(135deg, #0ea5e9, #0b5ea8);
-  color: #fff;
   font-size: 11px;
   font-weight: 900;
   letter-spacing: .35px;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.draft-finish-button {
+  border: 1px solid transparent;
+  background: linear-gradient(135deg, var(--primary), var(--primary-strong));
+  color: #fff;
   box-shadow: 0 7px 20px #0b5ea840;
 }
 
-.draft-finish-button:hover,
-.draft-edit-button:hover {
-  border-color: #67e8f9;
-  background: linear-gradient(135deg, #22d3ee, #0873bd);
+.draft-finish-button:hover {
+  background: linear-gradient(135deg, var(--primary-hover), var(--primary));
 }
 
 .draft-collapsed-summary {
@@ -124,8 +126,8 @@
   align-items: center;
   gap: 4px;
   padding: 0 9px;
-  border: 1px solid #2d465f;
-  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
   background: var(--bg);
   color: var(--text-muted);
   font-size: 11px;
@@ -147,10 +149,16 @@
   min-height: 36px;
   flex: none;
   padding: 0 13px;
-  border-color: #3884aa;
-  background: #0b355866;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-hover);
   box-shadow: none;
-  color: #dff7ff;
+  color: var(--text-emphasis);
+}
+
+.draft-edit-button:hover {
+  border-color: var(--primary-border);
+  background: var(--primary-soft);
+  color: var(--primary-text);
 }
 
 .group-builder-summary {
@@ -168,11 +176,6 @@
   color: var(--accent-text);
 }
 
-.group-builder-summary:focus-visible {
-  outline: 2px solid #22d3ee;
-  outline-offset: 6px;
-}
-
 .group-builder-toggle {
   width: 36px;
   height: 36px;
@@ -181,13 +184,13 @@
   place-items: center;
   border: 1px solid var(--border-strong);
   border-radius: 10px;
-  background: #0b355866;
-  color: #67e8f9;
+  background: var(--bg-hover);
+  color: var(--primary-text);
   transition: transform 180ms ease, background 180ms ease;
 }
 
 .group-builder-summary:hover .group-builder-toggle {
-  background: #0e749066;
+  background: var(--primary-soft);
 }
 
 .group-builder[open] .group-builder-summary {
