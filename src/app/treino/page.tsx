@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertDialog } from "@/components/alert-dialog";
 import { AppShell } from "@/components/app-shell";
 import { Guard } from "@/components/guard";
 import { useAuth } from "@/components/providers";
@@ -97,6 +98,8 @@ function Work() {
   const [skipTarget, setSkipTarget] = useState<number | null>(null);
   const [skipSaving, setSkipSaving] = useState(false);
   const [preferencesPanelOpen, setPreferencesPanelOpen] = useState(false);
+  const [workoutToDelete, setWorkoutToDelete] = useState<Workout | null>(null);
+  const [deletingWorkout, setDeletingWorkout] = useState(false);
   const { preferences, update: updateTrainingPreferences } = useTrainingPreferences();
   const prevRestSecondsRef = useRef(0);
   // Duracao total do descanso atual, usada somente para desenhar o progresso visual do
@@ -326,6 +329,19 @@ function Work() {
 
   async function reloadPlans() {
     setPlans(await workouts.list(uid!));
+  }
+
+  async function removeWorkout(workout: Workout) {
+    setDeletingWorkout(true);
+    try {
+      await workouts.remove(workout.id);
+      await reloadPlans();
+    } catch {
+      setMessage("Não foi possível excluir o treino.");
+    } finally {
+      setDeletingWorkout(false);
+      setWorkoutToDelete(null);
+    }
   }
 
   async function saveWorkout(event: React.FormEvent) {
@@ -636,7 +652,8 @@ function Work() {
         <div className="plan-actions workout-plan-actions"><Button className="workout-start-button" onClick={() => void start(workout)} disabled={Boolean(active)} aria-label="Iniciar treino"><Play size={17} fill="currentColor"/> <span className="action-label">INICIAR</span></Button><div className="workout-secondary-actions"><button className="workout-action-button" onClick={() => openBuilder(workout)} aria-label="Editar treino"><Pencil size={16}/> <span className="action-label">Editar</span></button><button className="workout-action-button" onClick={async () => { try { await workouts.duplicate(workout); await reloadPlans(); } catch { setMessage("Não foi possível duplicar o treino."); } }} aria-label="Duplicar treino"><Copy size={16}/> <span className="action-label">Duplicar</span></button><button className="workout-action-button" onClick={async () => { try { await workouts.save(workoutInput(workout, false), workout.id); await reloadPlans(); } catch { setMessage("Não foi possível arquivar o treino."); } }} aria-label="Arquivar treino"><Archive size={16}/> <span className="action-label">Arquivar</span></button></div></div>
       </Card>;
     })}</div>{!activePlans.length && builder === undefined && <Empty title="Nenhum treino ativo" detail="Use Novo treino para montar o seu."/>}
-      {archivedPlans.length > 0 && <section className="archived-section"><h2>Treinos arquivados</h2><div className="cards">{archivedPlans.map((workout) => <Card key={workout.id}><h2>{workout.title}</h2><p>{workout.description}</p><small>{workout.exercises.length} exercícios</small><div className="plan-actions"><Button className="outline" onClick={async () => { try { await workouts.save(workoutInput(workout, true), workout.id); await reloadPlans(); } catch { setMessage("Não foi possível restaurar o treino."); } }}>RESTAURAR</Button><button className="text-button danger-text" onClick={async () => { if (!confirm(`Excluir definitivamente ${workout.name}? As sessões históricas serão preservadas.`)) return; try { await workouts.remove(workout.id); await reloadPlans(); } catch { setMessage("Não foi possível excluir o treino."); } }}>Excluir definitivamente</button></div></Card>)}</div></section>}</>}
+      {archivedPlans.length > 0 && <section className="archived-section"><h2>Treinos arquivados</h2><div className="cards">{archivedPlans.map((workout) => <Card key={workout.id}><h2>{workout.title}</h2><p>{workout.description}</p><small>{workout.exercises.length} exercícios</small><div className="plan-actions"><Button className="outline" onClick={async () => { try { await workouts.save(workoutInput(workout, true), workout.id); await reloadPlans(); } catch { setMessage("Não foi possível restaurar o treino."); } }}>RESTAURAR</Button><button className="text-button danger-text" onClick={() => setWorkoutToDelete(workout)}>Excluir definitivamente</button></div></Card>)}</div></section>}</>}
+    {workoutToDelete && <AlertDialog eyebrow="CONFIRMAR EXCLUSÃO" title="Excluir definitivamente?" message={`Excluir definitivamente ${workoutToDelete.name}? As sessões históricas serão preservadas.`} confirmLabel={deletingWorkout ? "EXCLUINDO..." : "EXCLUIR DEFINITIVAMENTE"} disabled={deletingWorkout} onConfirm={() => void removeWorkout(workoutToDelete)} onCancel={() => setWorkoutToDelete(null)}/>}
   </AppShell>;
 }
 
