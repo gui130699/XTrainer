@@ -29,6 +29,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { workoutExerciseIssue, workoutFormSchema } from "@/lib/validation";
 
 const NOTIFICATION_ICON = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/xtrainer-user-icon-192.png`;
+// O badge da barra de status (Android) e desenhado pelo sistema usando SOMENTE o canal alfa
+// da imagem, como um silhueta branca - um PNG totalmente opaco (como o icone colorido acima)
+// vira um quadrado branco solido. Este arquivo e uma silhueta branca em fundo transparente,
+// gerada a partir do icone oficial, feita especificamente para esse uso.
+const NOTIFICATION_BADGE = `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/xtrainer-notification-badge.png`;
 // "renotify" existe na Notification API dos navegadores mas falta no lib.dom.d.ts do TypeScript.
 type ExtendedNotificationOptions = NotificationOptions & { renotify?: boolean };
 
@@ -170,10 +175,10 @@ function Work() {
       if (restSeconds > 0) {
         const minutes = String(Math.floor(restSeconds / 60)).padStart(2, "0");
         const secondsLabel = String(restSeconds % 60).padStart(2, "0");
-        return registration.showNotification("Descanso em andamento", { body: `⏱️ ${minutes}:${secondsLabel} restantes`, tag: "xtrainer-rest", silent: true, icon: NOTIFICATION_ICON, badge: NOTIFICATION_ICON });
+        return registration.showNotification("Descanso em andamento", { body: `⏱️ ${minutes}:${secondsLabel} restantes`, tag: "xtrainer-rest", silent: true, icon: NOTIFICATION_ICON, badge: NOTIFICATION_BADGE });
       }
       if (previous > 0 && session) {
-        return registration.showNotification("Descanso finalizado!", { body: "Hora da próxima série 💪", tag: "xtrainer-rest", renotify: true, icon: NOTIFICATION_ICON, badge: NOTIFICATION_ICON } as ExtendedNotificationOptions);
+        return registration.showNotification("Descanso finalizado!", { body: "Hora da próxima série 💪", tag: "xtrainer-rest", renotify: true, icon: NOTIFICATION_ICON, badge: NOTIFICATION_BADGE } as ExtendedNotificationOptions);
       }
     }).catch(() => undefined);
   }, [restSeconds, notifyPermission, session]);
