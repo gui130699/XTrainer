@@ -5,7 +5,7 @@ import { Guard } from "@/components/guard";
 import { useAuth } from "@/components/providers";
 import { Button, Card } from "@/components/ui";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { changePassword, friendlyAuthError, logout, updateProfile } from "@/services/auth";
+import { changePassword, friendlyAuthError, logout, signOutAndClearDevice, updateProfile } from "@/services/auth";
 import { useEffect, useMemo, useState } from "react";
 
 const MONTH_NAMES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -120,7 +120,10 @@ function Profile() {
     <Card><h2>Dados pessoais</h2><p>Informações corporais são opcionais e privadas.</p><form onSubmit={save}><div className="form-grid"><label>Nome<input required value={name} onChange={(event) => setName(event.target.value)} autoComplete="name"/></label><label>Altura (cm)<input value={height} onChange={(event) => setHeight(event.target.value)} type="number" min="1" max="300" step="0.1" inputMode="decimal"/></label><label>Data de nascimento<div className="birth-date-fields"><select aria-label="Dia" value={birthDay} onChange={(event) => setBirthDay(event.target.value)}><option value="">Dia</option>{dayOptions.map((day) => <option key={day} value={day}>{day}</option>)}</select><select aria-label="Mês" value={birthMonth} onChange={(event) => setBirthMonth(event.target.value)}><option value="">Mês</option>{MONTH_NAMES.map((label, index) => <option key={label} value={index + 1}>{label}</option>)}</select><select aria-label="Ano" value={birthYear} onChange={(event) => setBirthYear(event.target.value)}><option value="">Ano</option>{yearOptions.map((year) => <option key={year} value={year}>{year}</option>)}</select></div></label><label>Sexo (opcional)<select value={sex} onChange={(event) => setSex(event.target.value)}><option value="">Prefiro não informar</option><option value="female">Feminino</option><option value="male">Masculino</option><option value="other">Outro</option></select></label><label className="span-full">Objetivo<input value={goal} onChange={(event) => setGoal(event.target.value)} placeholder="Ex.: hipertrofia"/></label></div><div className="profile-form-actions"><Button disabled={saving}>{saving ? "SALVANDO..." : "SALVAR ALTERAÇÕES"}</Button></div></form></Card>
     <Card><h2>Segurança</h2><p>Confirme sua senha atual para proteger a conta.</p><form onSubmit={savePassword}><label>Senha atual<input required name="currentPassword" type="password" autoComplete="current-password"/></label><label>Nova senha<input required minLength={6} name="newPassword" type="password" autoComplete="new-password"/></label><label>Confirmar nova senha<input required minLength={6} name="confirmPassword" type="password" autoComplete="new-password"/></label><div className="profile-form-actions"><Button disabled={passwordSaving}>{passwordSaving ? "ALTERANDO..." : "ALTERAR SENHA"}</Button></div></form></Card>
     <Card><h2>Preferências</h2><p>Ajustes de exibição do aplicativo, salvos apenas neste dispositivo.</p><div className="profile-preference-row"><span>Tema</span><ThemeToggle/></div></Card>
-    <Button className="outline mobile-profile-logout" onClick={() => void logout()}>SAIR</Button>
+    <div className="profile-logout-actions">
+      <Button className="outline mobile-profile-logout" onClick={() => void logout()}>SAIR</Button>
+      <button type="button" className="text-button" onClick={() => { if (confirm("Isso vai sair da conta e apagar treinos, avaliações e preferências salvos offline NESTE dispositivo (nada é apagado da sua conta). Continuar?")) void signOutAndClearDevice(); }}>Sair e limpar dados deste dispositivo</button>
+    </div>
   </AppShell>;
 }
 

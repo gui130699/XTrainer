@@ -9,7 +9,7 @@ import {
   updateProfile as updateAuthProfile,
   type User,
 } from "firebase/auth";
-import { deleteField, doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { clearIndexedDbPersistence, deleteField, doc, getDoc, serverTimestamp, setDoc, terminate, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import type { SystemConfig, UserProfile } from "@/types";
 
@@ -104,4 +104,21 @@ export async function changePassword(user: User, currentPassword: string, newPas
   if (!user.email) throw new Error("A conta atual não possui e-mail para reautenticação.");
   await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, currentPassword));
   await updatePassword(user, newPassword);
+}
+
+// "Sair e limpar dados deste dispositivo": logout completo + apagar todo vestígio local do
+// XTrainer neste navegador (cache offline do Firestore, PWA, localStorage, sessionStorage).
+// NUNCA apaga dado remoto no Firestore - só o que ficou salvo neste aparelho. Cada etapa é
+// best-effort (uma falha isolada não deve impedir as demais nem travar o logout).
+export async function signOutAndClearDevice() {
+  try { await signOut(auth); } catch { /* segue mesmo se o signOut já tiver expirado */ }
+  try { await terminate(db); await clearIndexedDbPersistence(db); } catch { /* sem suporte/sem dado local */ }
+  try { localStorage.clear(); sessionStorage.clear(); } catch { /* armazenamento indisponível */ }
+  try {
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    }
+  } catch { /* Cache Storage indisponível */ }
+  window.location.reload();
 }
