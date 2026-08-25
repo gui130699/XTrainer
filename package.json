@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:unit": "tsx --test tests/*.test.ts",
-    "test:rules": "firebase emulators:exec --only firestore --project xtrainer-45f8d \"node --test tests/firestore.rules.test.mjs\"",
+    "test:rules": "firebase emulators:exec --only firestore --project xtrainer-45f8d \"node --test tests/firestore.rules.test.mjs && node --test tests/firestore.security-adversarial.test.mjs\"",
     "test": "npm run test:unit && npm run test:rules",
     "check:firebase-contract": "node scripts/check-firebase-contract.mjs"
   },

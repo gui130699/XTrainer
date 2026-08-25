@@ -28,13 +28,13 @@ service cloud.firestore {
         && data.keys().hasOnly(['uid', 'name', 'email', 'role', 'birthDate', 'height', 'sex', 'goal', 'photoURL', 'createdAt', 'updatedAt'])
         && data.uid == uid
         && data.uid is string
-        && data.name is string
-        && data.email is string
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 255
         && data.role in ['user', 'admin']
         && (!('birthDate' in data) || data.birthDate is string)
         && (!('height' in data) || data.height is number)
-        && (!('sex' in data) || data.sex is string)
-        && (!('goal' in data) || data.goal is string)
+        && (!('sex' in data) || (data.sex is string && data.sex.size() <= 20))
+        && (!('goal' in data) || (data.goal is string && data.goal.size() <= 200))
         && (!('photoURL' in data) || data.photoURL is string)
         && (!('createdAt' in data) || data.createdAt is timestamp)
         && (!('updatedAt' in data) || data.updatedAt is timestamp);
@@ -43,20 +43,23 @@ service cloud.firestore {
     function validExercise(data) {
       return data.keys().hasAll(['name', 'muscleGroup', 'active'])
         && data.keys().hasOnly(['id', 'name', 'nameEn', 'aliases', 'muscleGroup', 'muscleSubgroup', 'equipment', 'videoUrl', 'sortOrder', 'description', 'instructions', 'notes', 'active', 'createdAt', 'updatedAt'])
-        && data.name is string
-        && data.muscleGroup is string
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.muscleGroup is string && data.muscleGroup.size() >= 1 && data.muscleGroup.size() <= 60
         && data.active is bool
         && (!('id' in data) || data.id is string)
-        && (!('nameEn' in data) || data.nameEn is string)
-        && (!('aliases' in data) || data.aliases is list)
-        && (!('videoUrl' in data) || data.videoUrl is string)
+        && (!('nameEn' in data) || (data.nameEn is string && data.nameEn.size() <= 120))
+        && (!('aliases' in data) || (data.aliases is list && data.aliases.size() <= 20))
+        && (!('videoUrl' in data) || (data.videoUrl is string && data.videoUrl.matches('^https://(www[.])?(youtube[.]com|youtu[.]be)/.*')))
+        && (!('description' in data) || (data.description is string && data.description.size() <= 2000))
+        && (!('instructions' in data) || (data.instructions is string && data.instructions.size() <= 2000))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 4000))
         && (!('sortOrder' in data) || data.sortOrder is number);
     }
 
     function validMuscleGroup(data) {
       return data.keys().hasAll(['name', 'active'])
         && data.keys().hasOnly(['name', 'sortOrder', 'active', 'createdAt', 'updatedAt'])
-        && data.name is string
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 60
         && data.active is bool
         && (!('sortOrder' in data) || data.sortOrder is number);
     }
@@ -65,11 +68,12 @@ service cloud.firestore {
       return data.keys().hasAll(['ownerId', 'name', 'title', 'muscleGroups', 'exercises', 'active'])
         && data.keys().hasOnly(['id', 'ownerId', 'name', 'title', 'description', 'muscleGroups', 'exercises', 'exerciseGroups', 'active', 'createdAt', 'updatedAt'])
         && data.ownerId is string
-        && data.name is string
-        && data.title is string
-        && data.muscleGroups is list
-        && data.exercises is list
-        && (!('exerciseGroups' in data) || data.exerciseGroups is list)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 120
+        && (!('description' in data) || (data.description is string && data.description.size() <= 2000))
+        && data.muscleGroups is list && data.muscleGroups.size() <= 20
+        && data.exercises is list && data.exercises.size() <= 60
+        && (!('exerciseGroups' in data) || (data.exerciseGroups is list && data.exerciseGroups.size() <= 20))
         && data.active is bool;
     }
 
@@ -78,9 +82,9 @@ service cloud.firestore {
         && data.keys().hasOnly(['ownerId', 'workoutId', 'workoutName', 'startedAt', 'endedAt', 'durationSeconds', 'restEndsAt', 'exercises', 'exerciseGroups', 'totalVolume', 'totalSets', 'status', 'notes'])
         && data.ownerId is string
         && data.workoutId is string
-        && data.workoutName is string
-        && data.exercises is list
-        && (!('exerciseGroups' in data) || data.exerciseGroups is list)
+        && data.workoutName is string && data.workoutName.size() <= 120
+        && data.exercises is list && data.exercises.size() <= 60
+        && (!('exerciseGroups' in data) || (data.exerciseGroups is list && data.exerciseGroups.size() <= 20))
         && data.totalVolume is number
         && data.totalSets is number
         && data.status in ['active', 'completed', 'cancelled']
@@ -88,7 +92,7 @@ service cloud.firestore {
         && (!('endedAt' in data) || data.endedAt is timestamp)
         && (!('durationSeconds' in data) || data.durationSeconds is number)
         && (!('restEndsAt' in data) || data.restEndsAt is timestamp)
-        && (!('notes' in data) || data.notes is string);
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 4000));
     }
 
     function validSessionId(data, id) {
@@ -102,7 +106,7 @@ service cloud.firestore {
         && data.date is string
         && data.weight is number
         && data.weight > 0
-        && (!('note' in data) || data.note is string)
+        && (!('note' in data) || (data.note is string && data.note.size() <= 500))
         && (!('source' in data) || data.source in ['manual', 'assessment'])
         && (!('assessmentId' in data) || data.assessmentId is string);
     }
@@ -121,8 +125,8 @@ service cloud.firestore {
         && (!('bodyFat' in data) || data.bodyFat is number)
         && (!('fatMass' in data) || data.fatMass is number)
         && (!('leanMass' in data) || data.leanMass is number)
-        && (!('assessmentProtocol' in data) || data.assessmentProtocol is string)
-        && (!('notes' in data) || data.notes is string);
+        && (!('assessmentProtocol' in data) || (data.assessmentProtocol is string && data.assessmentProtocol.size() <= 200))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 4000));
     }
 
     match /system/config {
@@ -136,12 +140,20 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.role == 'user'
+        // E-mail do documento precisa nascer igual ao e-mail autenticado no momento do cadastro
+        // (quando o provedor expõe essa claim no token); impede um cliente adulterado de gravar
+        // um e-mail diferente do da conta Firebase Auth.
+        && (!('email' in request.auth.token) || request.resource.data.email == request.auth.token.email)
         && validUser(request.resource.data, uid);
       allow update: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.role == resource.data.role
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'email', 'birthDate', 'height', 'sex', 'goal', 'photoURL', 'updatedAt'])
+        // E-mail não é editável pela tela de Perfil: qualquer alteração de e-mail deve passar
+        // pelo fluxo dedicado do Firebase Auth (reautenticação + updateEmail + verificação),
+        // nunca por uma escrita direta neste documento.
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'birthDate', 'height', 'sex', 'goal', 'photoURL', 'updatedAt'])
         && validUser(request.resource.data, uid);
       allow delete: if false;
     }
@@ -205,7 +217,7 @@ service cloud.firestore {
         && data.keys().hasOnly(['ownerId', 'exerciseId', 'alternativeExerciseIds', 'createdAt', 'updatedAt'])
         && data.ownerId is string
         && data.exerciseId is string
-        && data.alternativeExerciseIds is list;
+        && data.alternativeExerciseIds is list && data.alternativeExerciseIds.size() <= 20;
     }
 
     match /exerciseSubstitutionPreferences/{id} {
@@ -226,7 +238,7 @@ service cloud.firestore {
         && request.resource.data.entityId is string
         && request.resource.data.timestamp is timestamp
         && (!('summary' in request.resource.data)
-          || request.resource.data.summary is string
+          || (request.resource.data.summary is string && request.resource.data.summary.size() <= 500)
           || request.resource.data.summary == null);
       allow update, delete: if false;
     }
