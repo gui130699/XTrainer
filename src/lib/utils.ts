@@ -1,3 +1,17 @@
+// Links de vídeo vêm do catálogo de exercícios (somente admin grava, mas uma conta admin
+// comprometida ou um valor colado por engano não pode virar um link clicável perigoso, ex.:
+// javascript:, data: ou um domínio arbitrário). O produto só usa vídeos do YouTube, então a
+// allowlist é por domínio, não apenas por protocolo.
+const SAFE_VIDEO_HOSTS = new Set(["www.youtube.com", "youtube.com", "youtu.be"]);
+export function safeVideoUrl(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && SAFE_VIDEO_HOSTS.has(url.hostname) ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
 export const kg = (n: number) => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(n) + " kg";
 export const duration = (s?: number) => { const m = Math.round((s ?? 0) / 60); return `${m} min`; };
 export const muscleGroups = ["Peitoral","Costas","Bíceps","Tríceps","Ombros","Quadríceps","Posteriores de coxa","Glúteos","Panturrilhas","Abdômen","Lombar","Antebraço","Trapézio","Corpo inteiro","Cardio","Mobilidade"];

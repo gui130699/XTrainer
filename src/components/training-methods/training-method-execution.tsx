@@ -3,6 +3,7 @@ import { Check, ChevronUp, ExternalLink, Pencil, Plus, Repeat, SkipForward, Undo
 import { useState } from "react";
 import { Button, Card } from "@/components/ui";
 import { trainingStageLabel } from "@/lib/training-methods";
+import { safeVideoUrl } from "@/lib/utils";
 import { ExerciseSwapPicker } from "@/components/training-methods/exercise-swap-picker";
 import type { Exercise, SessionExercise, TrainingSet } from "@/types";
 
@@ -29,7 +30,7 @@ export function TrainingMethodExecution({ exercise, exerciseIndex, exerciseCount
   const [collapsed, setCollapsed] = useState(false);
   const [prevAllCompleted, setPrevAllCompleted] = useState(allCompleted);
   if (allCompleted !== prevAllCompleted) { setPrevAllCompleted(allCompleted); if (allCompleted) setCollapsed(true); }
-  const videoUrl = library.find((item) => item.id === exercise.exerciseId)?.videoUrl;
+  const videoUrl = safeVideoUrl(library.find((item) => item.id === exercise.exerciseId)?.videoUrl);
 
   return <Card className={`exercise method-execution ${collapsed ? "is-collapsed" : ""} ${skipped ? "is-skipped" : ""}`}>
     <div className="method-execution-title">

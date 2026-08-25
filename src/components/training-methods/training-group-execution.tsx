@@ -3,6 +3,7 @@ import { Check, ChevronUp, ExternalLink, Pencil, Repeat, SkipForward, Undo2 } fr
 import { useState } from "react";
 import { Button, Card } from "@/components/ui";
 import { trainingStageLabel } from "@/lib/training-methods";
+import { safeVideoUrl } from "@/lib/utils";
 import { ExerciseSwapPicker } from "@/components/training-methods/exercise-swap-picker";
 import type { Exercise, SessionExercise, TrainingSet, WorkoutExerciseGroup } from "@/types";
 
@@ -33,7 +34,7 @@ export function TrainingGroupExecution({ group, members, allExercises, library, 
 
     <div className="group-members-header">{members.map((exercise) => {
       const exerciseIndex = allExercises.findIndex((item) => item.id === exercise.id);
-      const videoUrl = library.find((item) => item.id === exercise.exerciseId)?.videoUrl;
+      const videoUrl = safeVideoUrl(library.find((item) => item.id === exercise.exerciseId)?.videoUrl);
       const skipped = exercise.skipInfo?.skipped === true;
       return <div className="group-member-tools" key={exercise.id}>
         <span>{exercise.name}
