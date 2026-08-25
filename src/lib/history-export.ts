@@ -65,7 +65,11 @@ export const EXPORT_COLUMNS: [keyof ExportRow, string][] = [
 ];
 
 export function csvEscape(value: string) {
-  return /[",\n;]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  // Neutraliza injeção de fórmula (CSV injection): um valor começando com =, +, - ou @ seria
+  // interpretado como fórmula por Excel/Sheets ao abrir o arquivo exportado. workoutName e
+  // exerciseName podem conter texto escolhido pelo próprio usuário (nome do treino).
+  const safeValue = /^[=+\-@]/.test(value) ? `'${value}` : value;
+  return /[",\n;]/.test(safeValue) ? `"${safeValue.replace(/"/g, '""')}"` : safeValue;
 }
 
 // Gera o texto do CSV (sem BOM/Blob, que são responsabilidade do navegador) para poder ser testado

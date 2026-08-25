@@ -62,6 +62,14 @@ test("csvEscape só envolve em aspas quando o valor contém separador, aspas ou 
   assert.equal(csvEscape('Diz "oi"'), '"Diz ""oi"""');
 });
 
+test("csvEscape neutraliza injeção de fórmula (=, +, -, @ no início do valor)", () => {
+  assert.equal(csvEscape("=1+1"), "'=1+1");
+  assert.equal(csvEscape("+cmd|'/c calc'"), "'+cmd|'/c calc'");
+  assert.equal(csvEscape("-2+3"), "'-2+3");
+  assert.equal(csvEscape("@SUM(A1)"), "'@SUM(A1)");
+  assert.equal(csvEscape("Treino normal"), "Treino normal");
+});
+
 test("rowsToCsvText inclui o cabeçalho e uma linha por registro, separados por ponto e vírgula", () => {
   const rows = buildExportRows([makeSession()], formatDate);
   const csv = rowsToCsvText(rows);
