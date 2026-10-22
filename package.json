@@ -37,6 +37,6 @@
     "eslint-config-next": "^16.3.1",
     "firebase-tools": "^15.27.0",
     "tsx": "^4.23.12",
-    "typescript": "^5.7.2"
+    "typescript": "^7.0.2"
   }
 }
